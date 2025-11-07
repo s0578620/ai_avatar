@@ -1,0 +1,50 @@
+services:
+  api:
+    build: ./services/api
+    env_file: .env
+    ports: ["${API_PORT:-8000}:8000"]
+    depends_on: [redis, qdrant, ollama]
+
+  worker:
+    build: ./services/worker
+    env_file: .env
+    depends_on: [redis, qdrant, ollama]
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports: ["6333:6333","6334:6334"]
+    volumes: ["qdrant_storage:/qdrant/storage"]
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports: ["11434:11434"]
+    volumes: ["ollama_models:/root/.ollama"]
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=${DB_POSTGRESDB_USER:-n8n}
+      - POSTGRES_PASSWORD=${DB_POSTGRESDB_PASSWORD:-n8n}
+      - POSTGRES_DB=${DB_POSTGRESDB_DATABASE:-n8n}
+    volumes: ["db_data:/var/lib/postgresql/data"]
+    restart: unless-stopped
+
+  n8n:
+    image: n8nio/n8n:latest
+    env_file: .env
+    ports: ["${N8N_PORT:-5678}:5678"]
+    depends_on: [db, api]
+    volumes: ["n8n_data:/home/node/.n8n"]
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  n8n_data:
+  qdrant_storage:
+  ollama_models:

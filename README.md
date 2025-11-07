@@ -1,0 +1,59 @@
+# AI-Avatar
+
+## Setup
+
+
+Use WSL2 or Docker Desktop with WSL2 backend on Windows.
+
+## Setup
+```bash
+
+docker compose up -d --build
+
+./scripts/pull_models.sh
+```
+UIs: FastAPI http://localhost:8000/docs, n8n http://localhost:5678, Qdrant http://localhost:6333/dashboard
+
+## import Workflows to n8n
+- ./n8n_workflows/Avatar_Data_Ingestion.json
+- ./n8n_workflows/Avatar_ RAG_Chatbot.json
+
+
+
+## Healthcheck API
+```bash
+
+curl -s http://localhost:8000/health
+```
+
+## Ingest Sample Document
+```bash
+
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Das ist ein Qdrant Smoke-Test Dokument.","collection":"avatar_docs"}'
+```
+
+## Chat with Avatar RAG Bot
+```bash
+
+curl -s -X POST http://localhost:5678/webhook/avatar/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Worum geht es im Testdokument?","session_id":"demo","collection":"avatar_docs"}'
+```
+
+## Chat with Avatar RAG Bot (Testing)
+```bash
+
+curl -s -X POST http://localhost:5678/webhook-test/avatar/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Worum geht es im Testdokument?","session_id":"demo","collection":"avatar_docs"}'
+
+```
+
+
+## 
+```bash
+
+
+```

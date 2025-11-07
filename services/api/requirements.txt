@@ -1,0 +1,8 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.0
+celery[redis]==5.3.6
+pydantic==2.9.2
+redis==5.0.8
+qdrant-client==1.10.1
+requests==2.32.3
+langchain-text-splitters==0.3.2
