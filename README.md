@@ -53,6 +53,7 @@ curl -s -X POST http://localhost:5678/webhook-test/avatar/chat \
 
 # TODO:
 - session_id handling verbessern (at the moment u need to use different session_ids for different questions to avoid context mixing)
+- collections are not separated by default in the chatbot workflow (need to be fixed)
 
 # PLAYGROUND
 ## For longer documents (multiple questions)
