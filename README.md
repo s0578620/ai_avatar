@@ -51,9 +51,28 @@ curl -s -X POST http://localhost:5678/webhook-test/avatar/chat \
 
 ```
 
+# TODO:
+- session_id handling verbessern (at the moment u need to use different session_ids for different questions to avoid context mixing)
 
+# PLAYGROUND
+## For longer documents (multiple questions)
+USE WSL:
+```
+python3 - <<'PY' | curl -s -X POST http://localhost:8000/ingest -H 'Content-Type: application/json' -d @-
+import json,sys,io
+text = io.open('docs/doc.txt','r',encoding='utf-8').read()
+print(json.dumps({"text": text, "collection": "animals"}))
+PY
+
+```
+## Questions
 ## 
 ```bash
 
+curl -s -X POST http://localhost:5678/webhook/avatar/chat   -H 'Content-Type: application/json'   -d '{"message":"wo lebt der fuchs?","session_id":"new","collection":"avatar_docs"}'
+```
+## 
+```bash
 
+curl -s -X POST http://localhost:5678/webhook/avatar/chat   -H 'Content-Type: application/json'   -d '{"message":"wo lebt der fisch?","session_id":"new1","collection":"avatar_docs"}'
 ```
