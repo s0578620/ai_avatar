@@ -25,6 +25,17 @@ UIs: FastAPI http://localhost:8000/docs, n8n http://localhost:5678, Qdrant http:
 
 curl -s http://localhost:8000/health
 ```
+## Ingestion via Webhook
+```bash
+
+curl -X POST 'http://localhost:5678/webhook/614c42d0-7598-4478-b8b3-701dd2076b81' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "Der Fuchs lebt oft im Wald. Er baut sich kleine Höhlen im Boden oder benutzt Höhlen, die andere Tiere verlassen haben. Der Fisch lebt im Wasser. Es gibt viele verschiedene Fischarten. Manche leben im Meer, andere in Seen oder Flüssen. Der Adler lebt in den Bergen und baut sein Nest weit oben, zum Beispiel auf hohen Felsen oder in sehr hohen Bäumen.",
+    "collection": "avatar_docs"
+  }'
+```
+
 
 ## RAG Chat with Avatar Bot
 ```bash
