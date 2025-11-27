@@ -10,7 +10,6 @@ Use WSL2 or Docker Desktop with WSL2 backend on Windows.
 
 docker compose up -d --build
 
-./scripts/pull_models.sh
 ```
 UIs: FastAPI http://localhost:8000/docs, n8n http://localhost:5678, Qdrant http://localhost:6333/dashboard
 
