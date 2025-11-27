@@ -1,10 +1,10 @@
 {
-  "name": "Avatar_Data_Ingestion_native",
+  "name": "Avatar_Data_Ingestion_native:testing",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "614c42d0-7598-4478-b8b3-701dd2076b81",
+        "path": "4a9fca36-7902-4fb2-8a84-748351cf884a",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
@@ -13,9 +13,9 @@
         0,
         0
       ],
-      "id": "c5eaf048-2ecb-418e-8980-e27da4e62670",
+      "id": "69fbc6f9-87ec-4230-9674-0fb38f335a1e",
       "name": "On form suibmission",
-      "webhookId": "614c42d0-7598-4478-b8b3-701dd2076b81"
+      "webhookId": "4a9fca36-7902-4fb2-8a84-748351cf884a"
     },
     {
       "parameters": {
@@ -34,7 +34,7 @@
         464,
         240
       ],
-      "id": "899f9cec-b592-498e-b927-081bc02d3789",
+      "id": "2e72ed62-bb89-4a57-8336-6994b206a626",
       "name": "Default Data Loader"
     },
     {
@@ -51,27 +51,8 @@
         464,
         432
       ],
-      "id": "5869b48c-b15a-4f67-8033-c7adf7aef1ee",
+      "id": "52f5dc78-c8c2-46f3-a26f-405fd292d8f3",
       "name": "Recursive Character Text Splitter"
-    },
-    {
-      "parameters": {
-        "model": "nomic-embed-text:latest"
-      },
-      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
-      "typeVersion": 1,
-      "position": [
-        160,
-        320
-      ],
-      "id": "5d72ef62-734a-4be1-9f61-9f3763d04481",
-      "name": "Embeddings Ollama",
-      "credentials": {
-        "ollamaApi": {
-          "id": "TL0XXcu37XGgZmxL",
-          "name": "Ollama account"
-        }
-      }
     },
     {
       "parameters": {
@@ -90,12 +71,29 @@
         288,
         0
       ],
-      "id": "a7d085a4-cce1-470a-87f0-ae50fe68c886",
+      "id": "e8bcd9a7-e77c-4976-b977-bef64e38c331",
       "name": "Qdrant Vector Store1",
       "credentials": {
         "qdrantApi": {
           "id": "1yK0n7UwDneYKX54",
           "name": "QdrantApi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        160,
+        272
+      ],
+      "id": "40d7e2da-f128-4fce-8c64-40bdc1bf82f4",
+      "name": "Embeddings Google Gemini",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "v18Yp7zUEIiBr5ET",
+          "name": "Google Gemini(PaLM) Api account"
         }
       }
     }
@@ -135,7 +133,7 @@
         ]
       ]
     },
-    "Embeddings Ollama": {
+    "Embeddings Google Gemini": {
       "ai_embedding": [
         [
           {
@@ -151,11 +149,11 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "1dca43b8-4824-4927-9a02-3e349852f0d3",
+  "versionId": "26a484f3-928e-4df3-8888-37bfeae485e0",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "1803ef4b37d9278735bc19742b33f8d8c3fe03bf9bc08d5a3076f8ccf2edee47"
   },
-  "id": "2mhepiSslavolSg8",
+  "id": "uXyqToO1Qs2N6XWA",
   "tags": []
 }
