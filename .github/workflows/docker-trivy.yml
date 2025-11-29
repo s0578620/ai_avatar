@@ -16,26 +16,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
+      # API-Image bauen
       - name: Build API image
-        uses: docker/build-push-action@v6
-        with:
-          context: services/api
-          push: false
-          tags: local/ai-avatar-api:latest
+        run: |
+          docker build -t local/ai-avatar-api:latest services/api
 
+      # Worker-Image bauen
       - name: Build worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: services/worker
-          push: false
-          tags: local/ai-avatar-worker:latest
+        run: |
+          docker build -t local/ai-avatar-worker:latest services/worker
 
+      # Trivy-Scan für API
       - name: Scan API image
         uses: aquasecurity/trivy-action@master
         with:
@@ -45,6 +36,7 @@ jobs:
           ignore-unfixed: true
           severity: 'CRITICAL'
 
+      # Trivy-Scan für Worker
       - name: Scan worker image
         uses: aquasecurity/trivy-action@master
         with:
