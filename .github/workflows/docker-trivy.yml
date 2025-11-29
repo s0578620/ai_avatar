@@ -1,10 +1,9 @@
 name: Docker Trivy Scan
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
+
 
 permissions:
   contents: read
