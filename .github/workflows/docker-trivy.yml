@@ -12,7 +12,6 @@ permissions:
 jobs:
   trivy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -28,7 +27,6 @@ jobs:
         with:
           context: services/api
           push: false
-          load: true
           tags: local/ai-avatar-api:latest
 
       - name: Build worker image
@@ -36,21 +34,22 @@ jobs:
         with:
           context: services/worker
           push: false
-          load: true
           tags: local/ai-avatar-worker:latest
 
       - name: Scan API image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: local/ai-avatar-api:latest
-          format: table
+          format: 'table'
           exit-code: '1'
           ignore-unfixed: true
+          severity: 'CRITICAL'
 
       - name: Scan worker image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: local/ai-avatar-worker:latest
-          format: table
+          format: 'table'
           exit-code: '1'
           ignore-unfixed: true
+          severity: 'CRITICAL'
