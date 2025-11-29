@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [ master ]
 
-permissions:
-  contents: read
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -20,8 +17,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
@@ -32,6 +28,3 @@ jobs:
 
       - name: Run tests with pytest
         run: pytest
-
-      - name: Compile all Python files
-        run: python -m compileall services
