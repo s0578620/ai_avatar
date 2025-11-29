@@ -1,4 +1,46 @@
-name: docker-trivy.yml
+name: Docker Trivy Scan
+
 on:
+  pull_request:
+    branches: [ master ]
+
+
+permissions:
+  contents: read
 
 jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # API-Image bauen
+      - name: Build API image
+        run: |
+          docker build -t local/ai-avatar-api:latest services/api
+
+      # Worker-Image bauen
+      - name: Build worker image
+        run: |
+          docker build -t local/ai-avatar-worker:latest services/worker
+
+      # Trivy-Scan für API
+      - name: Scan API image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: local/ai-avatar-api:latest
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL'
+
+      # Trivy-Scan für Worker
+      - name: Scan worker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: local/ai-avatar-worker:latest
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL'
