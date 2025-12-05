@@ -7,6 +7,11 @@ from qdrant_client.http.models import VectorParams, Distance, PointStruct
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import google.generativeai as genai
 
+# --- Konfiguration aus Umgebungsvariablen ---
+DEFAULT_PERSONA = (
+    "You are an educational assistant for children between 8 and 13."
+)
+
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -23,6 +28,10 @@ class RAG:
         self.client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
+        """
+        Erzeugt für jeden Text einen Embedding-Vektor mit Gemini.
+        EMB_MODEL = 'text-embedding-004' liefert 768-dimensionale Vektoren.
+        """
         out: List[List[float]] = []
         for t in texts:
             res = genai.embed_content(
@@ -32,6 +41,8 @@ class RAG:
             )
             out.append(res["embedding"])
         return out
+
+    # --------- Qdrant-Handling ---------
 
     def ensure_collection(self, name: str, size: int):
         names = [c.name for c in self.client.get_collections().collections]
@@ -72,6 +83,8 @@ class RAG:
         )
         return [(r.score, r.payload) for r in res]
 
+    # --------- Text-Splitting ---------
+
     def split_text(self, text: str):
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=800,
@@ -79,20 +92,37 @@ class RAG:
         )
         return splitter.split_text(text)
 
+    # --------- Generieren mit Gemini ---------
+
     def generate(self, prompt: str) -> str:
+        """
+        Ruft das Chatmodell von Gemini auf.
+        """
         model = genai.GenerativeModel(CHAT_MODEL)
         resp = model.generate_content(prompt)
+
         return (resp.text or "").strip()
 
-    def build_prompt(self, question: str, contexts: List[str]) -> str:
-        ctx = "\n\n".join([f"[CTX {i+1}] {c}" for i, c in enumerate(contexts)])
-        return f"""You are a helpful assistant. Use only the provided context to answer.
-If the answer is not in the context, say you don't know.
+    # --------- Promptbau ---------
 
-[CONTEXT]
-{ctx}
+    def build_prompt(
+            self,
+            question: str,
+            contexts: List[str],
+            persona: str | None = None,
+    ) -> str:
+        # Wenn keine Persona mitgegeben wird, nimm die Standard-Persona
+        persona_text = persona or DEFAULT_PERSONA
 
-[QUESTION]
-{question}
+        ctx = "\n\n".join([f"[CTX {i + 1}] {c}" for i, c in enumerate(contexts)])
 
-[ANSWER]"""
+        return f"""{persona_text}
+    Use only the provided context to answer. If the answer is not in the context, say you don't know.
+
+    [CONTEXT]
+    {ctx}
+
+    [QUESTION]
+    {question}
+
+    [ANSWER]"""

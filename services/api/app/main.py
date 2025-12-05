@@ -1,9 +1,9 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from celery import Celery
 from celery.result import AsyncResult
-from .rag import RAG
+from services.shared.rag_core import RAG
 
 BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
@@ -29,6 +29,34 @@ class ChatIn(BaseModel):
 def health():
     return {"status": "ok"}
 
+@app.get("/health/qdrant")
+def health_qdrant():
+    try:
+        # einfacher Check: bekomme ich Collections zurück?
+        collections = rag.client.get_collections()
+        names = [c.name for c in collections.collections]
+        return {"status": "ok", "collections": names}
+    except Exception as e:
+        # 503 = Service unavailable
+        raise HTTPException(
+            status_code=503,
+            detail=f"Qdrant health check failed: {e}",
+        )
+
+@app.get("/health/gemini")
+def health_gemini():
+    try:
+        # leichter Test-Prompt, nutzt deine RAG.generate()-Methode
+        answer = rag.generate("ping")
+        return {
+            "status": "ok",
+            "sample_answer": (answer or "")[:80],  # nur ein kurzer Ausschnitt
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Gemini health check failed: {e}",
+        )
 @app.post("/ingest")
 def ingest(payload: IngestIn):
     collection = payload.collection or DEFAULT_COLLECTION
