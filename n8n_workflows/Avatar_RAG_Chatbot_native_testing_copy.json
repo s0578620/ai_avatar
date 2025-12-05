@@ -1,0 +1,121 @@
+{
+  "name": "Avatar_RAG_Chatbot_native:testing",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        320,
+        176
+      ],
+      "id": "ee779f4e-cc89-4918-bba8-37b1663819a8",
+      "name": "When chat message received",
+      "webhookId": "b675c023-0a40-4fab-8427-73a0f467cee6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"message\": $json[\"chatInput\"], \"session_id\": $json[\"sessionId\"], \"collection\": \"avatar_docs\" } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        176
+      ],
+      "id": "1f52c1de-9a0c-4bb8-9c73-2f452c6b7a01",
+      "name": "Call Backend /chat"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'http://api:8000/tasks/' + $json[\"task_id\"] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        176
+      ],
+      "id": "2c4c7f7e-4d6b-4e31-bcda-18c6c93e33d2",
+      "name": "Fetch Task Result"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "88bd7ff1-331a-4808-8fbc-e9bb7a567574",
+              "name": "chatOutput",
+              "value": "={{ $json[\"result\"][\"answer\"] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1500,
+        176
+      ],
+      "id": "c2258250-9b5f-4393-ac56-33a337e71d90",
+      "name": "Build Chat Response"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Call Backend /chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Backend /chat": {
+      "main": [
+        [
+          {
+            "node": "Fetch Task Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Task Result": {
+      "main": [
+        [
+          {
+            "node": "Build Chat Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e5b254c0-b111-4fa1-82af-d13a8523a62d",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "p8wP5Opvo3R8gzrN",
+  "tags": []
+}

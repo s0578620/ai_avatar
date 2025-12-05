@@ -1,0 +1,62 @@
+{
+  "name": "Avatar_Data_Ingestion_native:testing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "4a9fca36-7902-4fb2-8a84-748351cf884a",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "69fbc6f9-87ec-4230-9674-0fb38f335a1e",
+      "name": "On form submission",
+      "webhookId": "4a9fca36-7902-4fb2-8a84-748351cf884a"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"text\": $json[\"text\"], \"collection\": $json[\"collection\"] || \"avatar_docs\", \"doc_id\": $json[\"doc_id\"] || \"\", \"metadata\": $json[\"metadata\"] || {} } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        0
+      ],
+      "id": "c78c3f0f-3b1e-4c3a-9bcd-0c5679f1b001",
+      "name": "Call Backend /ingest"
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Call Backend /ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "26a484f3-928e-4df3-8888-37bfeae485e0",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "uXyqToO1Qs2N6XWA",
+  "tags": []
+}
