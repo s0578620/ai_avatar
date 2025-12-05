@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [ master ]
 
-
 permissions:
   contents: read
 
@@ -15,15 +14,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      # API-Image bauen
+      # API-Image bauen (Repo-Root als Kontext, expliziter Dockerfile)
       - name: Build API image
         run: |
-          docker build -t local/ai-avatar-api:latest services/api
+          docker build -t local/ai-avatar-api:latest . -f services/api/Dockerfile
 
-      # Worker-Image bauen
+      # Worker-Image bauen (Repo-Root als Kontext, expliziter Dockerfile)
       - name: Build worker image
         run: |
-          docker build -t local/ai-avatar-worker:latest services/worker
+          docker build -t local/ai-avatar-worker:latest . -f services/worker/Dockerfile
 
       # Trivy-Scan für API
       - name: Scan API image
