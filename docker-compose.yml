@@ -3,45 +3,90 @@ services:
     build:
       context: .
       dockerfile: services/api/Dockerfile
-    env_file: .env
-    ports: ["${API_PORT:-8000}:8000"]
-    depends_on: [redis, qdrant]
+    image: ai_avatar-api
+    env_file:
+      - .env
+    environment:
+      - USER_DB_URL=${USER_DB_URL}
+    depends_on:
+      - redis
+      - qdrant
+      - db
+    ports:
+      - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
 
   worker:
     build:
       context: .
       dockerfile: services/worker/Dockerfile
-    env_file: .env
-    depends_on: [redis, qdrant]
+    image: ai_avatar-worker
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - qdrant
+      - db
+    restart: unless-stopped
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
   qdrant:
     image: qdrant/qdrant:latest
-    ports: ["6333:6333","6334:6334"]
-    volumes: ["qdrant_storage:/qdrant/storage"]
-    restart: unless-stopped
-
-  db:
-    image: postgres:16
-    environment:
-      - POSTGRES_USER=${DB_POSTGRESDB_USER:-n8n}
-      - POSTGRES_PASSWORD=${DB_POSTGRESDB_PASSWORD:-n8n}
-      - POSTGRES_DB=${DB_POSTGRESDB_DATABASE:-n8n}
-    volumes: ["db_data:/var/lib/postgresql/data"]
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      # optional: gRPC-Port
+      # - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
     restart: unless-stopped
 
   n8n:
     image: n8nio/n8n:latest
-    env_file: .env
-    ports: ["${N8N_PORT:-5678}:5678"]
-    depends_on: [db, api]
-    volumes: ["n8n_data:/home/node/.n8n"]
+    container_name: n8n
+    env_file:
+      - .env
+    environment:
+      - DB_TYPE=${DB_TYPE}
+      - DB_POSTGRESDB_HOST=${DB_POSTGRESDB_HOST}
+      - DB_POSTGRESDB_PORT=${DB_POSTGRESDB_PORT}
+      - DB_POSTGRESDB_DATABASE=${DB_POSTGRESDB_DATABASE}
+      - DB_POSTGRESDB_USER=${DB_POSTGRESDB_USER}
+      - DB_POSTGRESDB_PASSWORD=${DB_POSTGRESDB_PASSWORD}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - NODE_ENV=production
+    depends_on:
+      - db
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    container_name: db
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${DB_POSTGRESDB_USER}
+      - POSTGRES_PASSWORD=${DB_POSTGRESDB_PASSWORD}
+      - POSTGRES_DB=${DB_POSTGRESDB_DATABASE}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
 volumes:
-  db_data:
+  postgres_data:
+  qdrant_data:
   n8n_data:
-  qdrant_storage:
