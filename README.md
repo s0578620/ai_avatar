@@ -37,7 +37,7 @@ DB_POSTGRESDB_PASSWORD=n8n
 DB_POSTGRESDB_DATABASE=n8n
 ```
 
-## Setup
+## Start Project
 ```bash
 docker compose up -d --build
 ```
@@ -45,8 +45,8 @@ docker compose up -d --build
 UIs: FastAPI http://localhost:8000/docs, n8n http://localhost:5678, Qdrant http://localhost:6333/dashboard
 
 ## import Workflows to n8n
-- ./n8n_workflows/Avatar_Data_Ingestion_native_testing.json
-- ./n8n_workflows/Avatar_RAG_Chat_native_testing.json
+- ./n8n_workflows/Avatar_Data_Ingestion_native_testing_copy.json
+- ./n8n_workflows/Avatar_RAG_Chat_native_testing_copy.json
 
 
 ## Healthcheck API
