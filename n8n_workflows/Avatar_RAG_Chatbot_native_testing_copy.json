@@ -9,10 +9,10 @@
       "type": "@n8n/n8n-nodes-langchain.chatTrigger",
       "typeVersion": 1.3,
       "position": [
-        -208,
-        160
+        -1040,
+        -192
       ],
-      "id": "9ae948b8-5368-4cdf-b39b-246e146f80bb",
+      "id": "6a3d1ddf-ac48-4ee0-ba27-a7924a92a166",
       "name": "When chat message received",
       "webhookId": "b675c023-0a40-4fab-8427-73a0f467cee6"
     },
@@ -21,17 +21,51 @@
         "method": "POST",
         "url": "http://api:8000/chat",
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { \"message\": $json[\"chatInput\"], \"session_id\": $json[\"sessionId\"], \"collection\": \"avatar_docs\" } }}",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $node[\"When chat message received\"].json[\"chatInput\"] }}"
+            },
+            {
+              "name": "session_id",
+              "value": "={{ $node[\"When chat message received\"].json[\"sessionId\"] }}\n"
+            },
+            {
+              "name": "collection",
+              "value": "avatar_docs"
+            },
+            {
+              "name": "student_id",
+              "value": "={{ $node[\"Fetch User Profile\"].json[\"student_id\"] }}\n"
+            },
+            {
+              "name": "student_name",
+              "value": "={{ $node[\"Fetch User Profile\"].json[\"student_name\"] }}\n"
+            },
+            {
+              "name": "class_id",
+              "value": "={{ $node[\"Fetch User Profile\"].json[\"class_id\"] }}\n"
+            },
+            {
+              "name": "class_name",
+              "value": "={{ $node[\"Fetch User Profile\"].json[\"interests\"] }}\n"
+            },
+            {
+              "name": "interests",
+              "value": "={{ $node[\"Fetch User Profile\"].json[\"interests\"] }}\n"
+            }
+          ]
+        },
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        192,
-        160
+        -352,
+        -208
       ],
-      "id": "cc1d25d8-32bc-4c37-a1e9-869a348e6251",
+      "id": "7ebe4f06-c433-4c0b-a742-5591b8c47b49",
       "name": "Call Backend /chat"
     },
     {
@@ -42,10 +76,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        592,
-        160
+        112,
+        -208
       ],
-      "id": "57444bf9-5201-4911-92b9-113ae7ef1f6b",
+      "id": "49717200-3f1f-4229-8c47-73ddc49086cc",
       "name": "Fetch Task Result"
     },
     {
@@ -65,23 +99,140 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        976,
-        160
+        448,
+        0
       ],
-      "id": "36e0b5ab-cb4e-4b21-8b1f-d4cc1026ddd7",
+      "id": "2cdef2bd-8df3-4d73-9f9c-723535992afc",
       "name": "Build Chat Response"
     },
     {
-      "parameters": {},
+      "parameters": {
+        "amount": 1
+      },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        384,
-        160
+        -160,
+        -208
       ],
-      "id": "8f5be1bc-b9b9-40a5-adce-b0448c316a70",
+      "id": "34b1af24-5a89-4ac8-9746-4a060b30f63e",
       "name": "Wait",
-      "webhookId": "fd2cc0ec-3a28-48bd-9902-3a148d9ccfbf"
+      "webhookId": "fd2cc0ec-3a28-48bd-9902-3a148d9ccfbf",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/api/user/profile",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "student_id",
+              "value": "={{ $json[\"studentId\"] }}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -624,
+        0
+      ],
+      "id": "6c4821b3-7e9d-4c58-b5da-3c27f71f1e29",
+      "name": "Fetch User Profile"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fdf0e36e-2757-4288-9e03-e093e9bf39e7",
+              "name": "studentId",
+              "value": "2",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -848,
+        -352
+      ],
+      "id": "44a9215d-e1c6-4a04-8170-f3efa0be38dd",
+      "name": "Set studentId"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f3352eab-5c3f-4cd7-8d6a-3a5dd822fd52",
+              "leftValue": "={{$json[\"status\"]}}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "370b27c8-78c3-48dc-94d1-ab671fdbe8ea",
+              "leftValue": "={{ $json[\"attempt\"] ?? 0 }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        16
+      ],
+      "id": "9093841f-7ac6-452f-9f94-9cd155e2ab74",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4e7f754c-c15d-4cae-8675-b5db84ccec9e",
+              "name": "attempt",
+              "value": "={{ ($json[\"attempt\"] ?? 0) + 1 }}\n",
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        384,
+        -208
+      ],
+      "id": "d7924e28-2602-4d99-84c9-5c6566e12cce",
+      "name": "attempt"
     }
   ],
   "pinData": {},
@@ -90,7 +241,7 @@
       "main": [
         [
           {
-            "node": "Call Backend /chat",
+            "node": "Set studentId",
             "type": "main",
             "index": 0
           }
@@ -112,7 +263,7 @@
       "main": [
         [
           {
-            "node": "Build Chat Response",
+            "node": "attempt",
             "type": "main",
             "index": 0
           }
@@ -129,17 +280,67 @@
           }
         ]
       ]
+    },
+    "Fetch User Profile": {
+      "main": [
+        [
+          {
+            "node": "Call Backend /chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set studentId": {
+      "main": [
+        [
+          {
+            "node": "Fetch User Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Build Chat Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "attempt": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "f67b8ead-744b-43af-814c-cea5b48102db",
+  "versionId": "3d6fa7f3-879e-46a0-9baa-65dca238b3d1",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "a8f8a55b331e9514541a7d5c55e9f9fa5aaac44f8951dfcc0ad43853d8b90e45"
   },
-  "id": "e2HUvC4d8izDp4Hr",
+  "id": "5u8upWU1v6PnlUO0",
   "tags": []
 }

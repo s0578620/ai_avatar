@@ -35,6 +35,13 @@ DB_POSTGRESDB_PORT=5432
 DB_POSTGRESDB_USER=n8n
 DB_POSTGRESDB_PASSWORD=n8n
 DB_POSTGRESDB_DATABASE=n8n
+
+# SQLAlchemy-URL für die User-DB (Teacher / Klassen / Schüler / Interessen)
+USER_DB_URL=postgresql+psycopg2://n8n:n8n@db:5432/avatar_userdb
+
+# Optional: von den Worker-Tasks verwendete Basis-URL für die User-API
+# (Standard ist http://api:8000)
+# USER_API_BASE=http://api:8000
 ```
 
 ## Start Project
@@ -66,13 +73,32 @@ curl -s http://localhost:8000/health/gemini
 ## Direkte RAG API-Nutzung
 
 ### Ingestion via API
+Minimal:
 ```bash
-curl -X POST "http://localhost:8000/ingest"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{
     "text": "Paris ist die Hauptstadt von Frankreich.",
     "collection": "avatar_docs"
   }'
 ```
+Mit doc_id + Metadaten:
+```bash
+curl -X POST "http://localhost:8000/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Der Fuchs lebt im Wald und ist ein schlaues Tier.",
+    "collection": "avatar_docs",
+    "doc_id": "fox_facts_01",
+    "metadata": {
+      "class_id": 1,
+      "subject": "Sachkunde",
+      "source": "Arbeitsblatt"
+    }
+  }'
+```
 
+```bash
 Beispiel-Antwort:
 ```json
 {
@@ -88,10 +114,13 @@ curl "http://localhost:8000/tasks/cc186c96-eafd-498b-b99d-7589cc96ac53"
 
 ### RAG Chat via API
 ```bash
-curl -X POST "http://localhost:8000/chat"   -H "Content-Type: application/json"   -d '{
-    "message": "Was ist die Hauptstadt von Frankreich?",
+curl -X POST "http://localhost:8000/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Kannst du mir etwas Spannendes über den Fuchs erklären?",
     "session_id": "demo-session-1",
-    "collection": "avatar_docs"
+    "collection": "avatar_docs",
+    "student_id": 2
   }'
 ```
 
@@ -108,43 +137,94 @@ Ergebnis abholen:
 curl "http://localhost:8000/tasks/e92067fe-1e5d-4d12-82ef-c69d64eba742"
 ```
 
-Beispiel-Result:
+---
+## UserDb API (Teacher-Student)
+
+### register Teacher
+```bash
+curl -X POST "http://localhost:8000/api/teachers/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Demo",
+    "email": "demo@example.com",
+    "password": "test123"
+  }'
+```
+Beispiel-Antwort:
 ```json
 {
-  "task_id": "e92067fe-1e5d-4d12-82ef-c69d64eba742",
-  "status": "SUCCESS",
-  "result": {
-    "answer": "Paris ist die Hauptstadt von Frankreich.",
-    "documents": [
-      "Paris ist die Hauptstadt von Frankreich.",
-      "",
-      ""
-    ],
-    "scores": [0.9361528, 0.47156176, 0.47156176, 0.4188522]
-  }
+  "name": "Demo",
+  "email": "demo@example.com",
+  "id": 1
+}
+```
+### Teacher Login
+```bash
+---
+## Ingestion via Webhook
+```bash
+curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "demo@example.com",
+    "password": "test123"
+  }'
+```
+Beispiel-Antwort:
+```json
+{
+  "teacher_id": 1
 }
 ```
 
----
-
-## Ingestion via Webhook
+### Klasse anlegen
 ```bash
-curl -X POST 'http://localhost:5678/webhook/4a9fca36-7902-4fb2-8a84-748351cf884a'   -H 'Content-Type: application/json'   -d '{
-    "text": "Der Fuchs lebt oft im Wald. Er baut sich kleine Höhlen im Boden oder benutzt Höhlen, die andere Tiere verlassen haben. Der Fisch lebt im Wasser. Es gibt viele verschiedene Fischarten. Manche leben im Meer, andere in Seen oder Flüssen. Der Adler lebt in den Bergen und baut sein Nest weit oben, zum Beispiel auf hohen Felsen oder in sehr hohen Bäumen.",
-    "collection": "avatar_docs"
+curl -X POST "http://localhost:8000/api/classes" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Klasse 5A",
+    "teacher_id": 1,
+    "grade_level": "5",
+    "subject": "Mathematik"
+  }'
+```
+### Klassen auflisten
+
+```bash
+curl "http://localhost:8000/api/classes"
+```
+
+### Schüler in Klasse anlegen
+```bash
+curl -X POST "http://localhost:8000/api/classes/1/students" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Max Mustermann",
+    "class_id": 1,
+    "username": "max1",
+    "password": "geheim123"
+  }'
+```
+### Schülerliste als CSV exportieren
+```bash
+curl "http://localhost:8000/api/classes/1/students/export" \
+  -o class_1_students.csv
+```
+
+### Interessen für Schüler speichern
+```bash
+curl -X POST "http://localhost:8000/api/user/interests" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "student_id": 1,
+    "interest_text": "Mag Tiere und Minecraft"
   }'
 ```
 
-## RAG Chat with Avatar Bot
+### User Profile abrufen
 ```bash
-curl -X POST 'http://localhost:5678/webhook/b675c023-0a40-4fab-8427-73a0f467cee6/chat'   -H 'Content-Type: application/json'   -d '{
-    "sessionId": "demo-session-1",
-    "action": "sendMessage",
-    "chatInput": "Wo lebt der Fuchs?"
-  }'
+curl "http://localhost:8000/api/user/profile?student_id=1"
 ```
-
----
 
 ## Tests lokal ausführen (optional)
 ```bash
