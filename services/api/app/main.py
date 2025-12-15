@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from celery import Celery
 from celery.result import AsyncResult
 from services.shared.rag_core import RAG
+from .userdb.database import init_db
+from .userdb.routes import router as userdb_router
 
 BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
@@ -13,6 +15,11 @@ celery = Celery(__name__, broker=BROKER_URL, backend=RESULT_BACKEND)
 rag = RAG()
 
 app = FastAPI(title="Avatar RAG API", version="0.3.0")
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
+app.include_router(userdb_router)
 
 class IngestIn(BaseModel):
     text: str

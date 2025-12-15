@@ -35,6 +35,8 @@ DB_POSTGRESDB_PORT=5432
 DB_POSTGRESDB_USER=n8n
 DB_POSTGRESDB_PASSWORD=n8n
 DB_POSTGRESDB_DATABASE=n8n
+
+USER_DB_URL=postgresql+psycopg2://n8n:n8n@db:5432/avatar_userdb
 ```
 
 ## Start Project
@@ -126,25 +128,94 @@ Beispiel-Result:
 ```
 
 ---
+## UserDb API (Teacher-Student)
 
+### register Teacher
+```bash
+curl -X POST "http://localhost:8000/api/teachers/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Demo",
+    "email": "demo@example.com",
+    "password": "test123"
+  }'
+
+```
+Beispiel-Antwort:
+```json
+{
+  "name": "Demo",
+  "email": "demo@example.com",
+  "id": 1
+}
+```
+### login Teacher
+```bash
+---
 ## Ingestion via Webhook
 ```bash
-curl -X POST 'http://localhost:5678/webhook/4a9fca36-7902-4fb2-8a84-748351cf884a'   -H 'Content-Type: application/json'   -d '{
-    "text": "Der Fuchs lebt oft im Wald. Er baut sich kleine Höhlen im Boden oder benutzt Höhlen, die andere Tiere verlassen haben. Der Fisch lebt im Wasser. Es gibt viele verschiedene Fischarten. Manche leben im Meer, andere in Seen oder Flüssen. Der Adler lebt in den Bergen und baut sein Nest weit oben, zum Beispiel auf hohen Felsen oder in sehr hohen Bäumen.",
-    "collection": "avatar_docs"
+curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "demo@example.com",
+    "password": "test123"
   }'
 ```
+Beispiel-Antwort:
+```json
+{
+  "teacher_id": 1
+}
+```
 
-## RAG Chat with Avatar Bot
+### Klasse anlegen
 ```bash
-curl -X POST 'http://localhost:5678/webhook/b675c023-0a40-4fab-8427-73a0f467cee6/chat'   -H 'Content-Type: application/json'   -d '{
-    "sessionId": "demo-session-1",
-    "action": "sendMessage",
-    "chatInput": "Wo lebt der Fuchs?"
+curl -X POST "http://localhost:8000/api/classes" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Klasse 5A",
+    "teacher_id": 1,
+    "grade_level": "5",
+    "subject": "Mathematik"
+  }'
+```
+### Klassen auflisten
+
+```bash
+curl "http://localhost:8000/api/classes"
+```
+
+### Schüler in Klasse anlegen
+```bash
+curl -X POST "http://localhost:8000/api/classes/1/students" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Max Mustermann",
+    "class_id": 1,
+    "username": "max1",
+    "password": "geheim123"
+  }'
+```
+### Schülerliste als CSV exportieren
+```bash
+curl "http://localhost:8000/api/classes/1/students/export" \
+  -o class_1_students.csv
+```
+
+### Interessen für Schüler speichern
+```bash
+curl -X POST "http://localhost:8000/api/user/interests" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "student_id": 1,
+    "interest_text": "Mag Tiere und Minecraft"
   }'
 ```
 
----
+### User Profile abrufen
+```bash
+curl "http://localhost:8000/api/user/profile?student_id=1"
+```
 
 ## Tests lokal ausführen (optional)
 ```bash
