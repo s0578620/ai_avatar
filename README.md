@@ -36,7 +36,12 @@ DB_POSTGRESDB_USER=n8n
 DB_POSTGRESDB_PASSWORD=n8n
 DB_POSTGRESDB_DATABASE=n8n
 
+# SQLAlchemy-URL für die User-DB (Teacher / Klassen / Schüler / Interessen)
 USER_DB_URL=postgresql+psycopg2://n8n:n8n@db:5432/avatar_userdb
+
+# Optional: von den Worker-Tasks verwendete Basis-URL für die User-API
+# (Standard ist http://api:8000)
+# USER_API_BASE=http://api:8000
 ```
 
 ## Start Project
@@ -68,13 +73,32 @@ curl -s http://localhost:8000/health/gemini
 ## Direkte RAG API-Nutzung
 
 ### Ingestion via API
+Minimal:
 ```bash
-curl -X POST "http://localhost:8000/ingest"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{
     "text": "Paris ist die Hauptstadt von Frankreich.",
     "collection": "avatar_docs"
   }'
 ```
+Mit doc_id + Metadaten:
+```bash
+curl -X POST "http://localhost:8000/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Der Fuchs lebt im Wald und ist ein schlaues Tier.",
+    "collection": "avatar_docs",
+    "doc_id": "fox_facts_01",
+    "metadata": {
+      "class_id": 1,
+      "subject": "Sachkunde",
+      "source": "Arbeitsblatt"
+    }
+  }'
+```
 
+```bash
 Beispiel-Antwort:
 ```json
 {
@@ -90,10 +114,13 @@ curl "http://localhost:8000/tasks/cc186c96-eafd-498b-b99d-7589cc96ac53"
 
 ### RAG Chat via API
 ```bash
-curl -X POST "http://localhost:8000/chat"   -H "Content-Type: application/json"   -d '{
-    "message": "Was ist die Hauptstadt von Frankreich?",
+curl -X POST "http://localhost:8000/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Kannst du mir etwas Spannendes über den Fuchs erklären?",
     "session_id": "demo-session-1",
-    "collection": "avatar_docs"
+    "collection": "avatar_docs",
+    "student_id": 2
   }'
 ```
 
@@ -110,23 +137,6 @@ Ergebnis abholen:
 curl "http://localhost:8000/tasks/e92067fe-1e5d-4d12-82ef-c69d64eba742"
 ```
 
-Beispiel-Result:
-```json
-{
-  "task_id": "e92067fe-1e5d-4d12-82ef-c69d64eba742",
-  "status": "SUCCESS",
-  "result": {
-    "answer": "Paris ist die Hauptstadt von Frankreich.",
-    "documents": [
-      "Paris ist die Hauptstadt von Frankreich.",
-      "",
-      ""
-    ],
-    "scores": [0.9361528, 0.47156176, 0.47156176, 0.4188522]
-  }
-}
-```
-
 ---
 ## UserDb API (Teacher-Student)
 
@@ -139,7 +149,6 @@ curl -X POST "http://localhost:8000/api/teachers/register" \
     "email": "demo@example.com",
     "password": "test123"
   }'
-
 ```
 Beispiel-Antwort:
 ```json
@@ -149,7 +158,7 @@ Beispiel-Antwort:
   "id": 1
 }
 ```
-### login Teacher
+### Teacher Login
 ```bash
 ---
 ## Ingestion via Webhook
