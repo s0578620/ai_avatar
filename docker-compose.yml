@@ -14,6 +14,8 @@ services:
       - db
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./data/media:/data/media
     restart: unless-stopped
 
   worker:
@@ -28,6 +30,8 @@ services:
       - qdrant
       - db
       - api
+    volumes:
+      - ./data/media:/data/media
     restart: unless-stopped
 
   redis:
