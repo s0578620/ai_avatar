@@ -8,6 +8,7 @@ from celery.result import AsyncResult
 from services.shared.rag_core import RAG
 from .userdb.database import init_db
 from .userdb.routes import router as userdb_router
+from .media import router as media_router
 
 # --------------------
 # Celery / RAG Setup
@@ -31,9 +32,8 @@ def startup_event():
     init_db()
 
 
-# Hängt deine User-DB-Routen unter /api/... ein
 app.include_router(userdb_router)
-
+app.include_router(media_router, prefix="/api")
 
 # --------------------
 # Schemas
