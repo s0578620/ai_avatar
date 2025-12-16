@@ -141,6 +141,7 @@ def list_media(
     class_id: Optional[int] = None,
     teacher_id: Optional[int] = None,
     tag: Optional[str] = None,
+    type: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -157,10 +158,10 @@ def list_media(
         query = query.filter(Media.teacher_id == teacher_id)
     if tag:
         query = query.filter(Media.tags.contains([tag]))
-
+    if type:
+        query = query.filter(Media.type == type)
     items = query.order_by(Media.created_at.desc()).all()
     return items
-
 
 @router.delete("/{media_id}")
 def delete_media(

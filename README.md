@@ -39,6 +39,9 @@ DB_POSTGRESDB_DATABASE=n8n
 # SQLAlchemy-URL für die User-DB (Teacher / Klassen / Schüler / Interessen)
 USER_DB_URL=postgresql+psycopg2://n8n:n8n@db:5432/avatar_userdb
 
+# Speicherort für hochgeladene Medien im Container
+MEDIA_ROOT=/data/media
+
 # Optional: von den Worker-Tasks verwendete Basis-URL für die User-API
 # (Standard ist http://api:8000)
 # USER_API_BASE=http://api:8000
@@ -285,6 +288,17 @@ Beispiel Antwort:
   }
 ]
 ```
+Nach Type filtern:
+Image-Dateien:
+
+```bash
+"http://localhost:8000/api/media/?tag=fuchs&type=image"
+```
+PDF-Dateien:
+```bash
+"http://localhost:8000/api/media/?tag=arbeitsblatt&type=pdf"
+``` 
+
 ### Medien löschen
 ```bash
 curl -X DELETE "http://localhost:8000/api/media/1"
