@@ -12,8 +12,17 @@ from sqlalchemy.orm import Session
 
 from .userdb.database import Base, get_db
 
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/data/media"))
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "./data/media"))
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+try:
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    # Fallback für CI / read-only Filesysteme:
+    from tempfile import gettempdir
+
+    MEDIA_ROOT = Path(gettempdir()) / "media"
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -78,15 +87,14 @@ def _parse_tags(raw: Optional[str]) -> Optional[List[str]]:
     if raw.startswith("["):
         import json
 
+        value = None
         try:
             value = json.loads(raw)
-            if isinstance(value, list):
-                return [str(v).strip() for v in value if str(v).strip()]
-        except Exception:
-            pass
+        except json.JSONDecodeError:
+            value = None
 
-    # Fallback: Komma-getrennt
-    return [t.strip() for t in raw.split(",") if t.strip()]
+        if isinstance(value, list):
+            return [str(v).strip() for v in value if str(v).strip()]
 
 
 # -----------------------
