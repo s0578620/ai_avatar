@@ -12,3 +12,4 @@ psycopg2-binary
 passlib>=1.7.4
 python-dotenv
 email-validator
+python-multipart

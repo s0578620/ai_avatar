@@ -23,6 +23,7 @@ Base = declarative_base()
 def init_db():
     """Tabellen erstellen, falls sie noch nicht existieren."""
     from . import models
+    from ..media import Media
     Base.metadata.create_all(bind=engine)
 
 def get_db():

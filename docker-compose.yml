@@ -8,12 +8,15 @@ services:
       - .env
     environment:
       - USER_DB_URL=${USER_DB_URL}
+      - MEDIA_ROOT=/data/media
     depends_on:
       - redis
       - qdrant
       - db
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./data/media:/data/media
     restart: unless-stopped
 
   worker:
@@ -23,11 +26,15 @@ services:
     image: ai_avatar-worker
     env_file:
       - .env
+    environment:
+      - MEDIA_ROOT=/data/media
     depends_on:
       - redis
       - qdrant
       - db
       - api
+    volumes:
+      - ./data/media:/data/media
     restart: unless-stopped
 
   redis:

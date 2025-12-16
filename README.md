@@ -39,6 +39,9 @@ DB_POSTGRESDB_DATABASE=n8n
 # SQLAlchemy-URL für die User-DB (Teacher / Klassen / Schüler / Interessen)
 USER_DB_URL=postgresql+psycopg2://n8n:n8n@db:5432/avatar_userdb
 
+# Speicherort für hochgeladene Medien im Container
+MEDIA_ROOT=/data/media
+
 # Optional: von den Worker-Tasks verwendete Basis-URL für die User-API
 # (Standard ist http://api:8000)
 # USER_API_BASE=http://api:8000
@@ -225,6 +228,95 @@ curl -X POST "http://localhost:8000/api/user/interests" \
 ```bash
 curl "http://localhost:8000/api/user/profile?student_id=1"
 ```
+## Media API (Datei-Upload für Lehrkräfte)
+Die Media-API erlaubt es Lehrkräften, Dateien (z. B. Bilder) hochzuladen und mit Klassen / Tags zu verknüpfen.  
+Die Dateien werden im Container unter `MEDIA_ROOT` gespeichert (Standard: `/data/media`)
+### Beispiel: Bild-Upload
+```bash
+curl -X POST "http://localhost:8000/api/media/" \
+  -F "teacher_id=1" \
+  -F "class_id=1" \
+  -F "type=image" \
+  -F 'tags=["tiere","fuchs"]' \
+  -F "file=@files_test/fuchs.webp"
+
+Beispiel-Antwort:
+```json
+{
+  "id": 1,
+  "teacher_id": 1,
+  "class_id": 1,
+  "type": "image",
+  "original_filename": "fuchs.webp",
+  "path": "/data/media/009289b429814990b54f3dc3d058df63.webp",
+  "thumbnail_path": null,
+  "tags": ["tiere", "fuchs"],
+  "created_at": "2025-12-16T09:50:42.073747"
+}
+
+```
+### Media-Datei abrufen
+Alle Media-Dateien auflisten:
+```bash
+curl "http://localhost:8000/api/media/"
+```
+Nach Klasse filtern:
+```bash
+curl "http://localhost:8000/api/media/?class_id=1"
+```
+Nach Lehrkraft filtern:
+```bash
+curl "http://localhost:8000/api/media/?teacher_id=1"
+```
+Nach Tags filtern:
+```bash
+curl "http://localhost:8000/api/media/?tags=tiere,fuchs"
+```
+Beispiel Antwort:
+```json
+[
+  {
+    "id": 1,
+    "teacher_id": 1,
+    "class_id": 1,
+    "type": "image",
+    "original_filename": "fuchs.webp",
+    "path": "/data/media/009289b429814990b54f3dc3d058df63.webp",
+    "thumbnail_path": null,
+    "tags": ["tiere", "fuchs"],
+    "created_at": "2025-12-16T09:50:42.073747"
+  }
+]
+```
+Nach Type filtern:
+Image-Dateien:
+
+```bash
+"http://localhost:8000/api/media/?tag=fuchs&type=image"
+```
+PDF-Dateien:
+```bash
+"http://localhost:8000/api/media/?tag=arbeitsblatt&type=pdf"
+``` 
+
+### Medien löschen
+```bash
+curl -X DELETE "http://localhost:8000/api/media/1"
+``` 
+Beispiel Antwort:
+```json
+[
+ {
+   "status": "deleted",
+   "id": 1
+ }
+]
+```
+[
+  {
+    "id": 1,
+    "teacher_id": 1,
+    "class_id": 1,
 
 ## Tests lokal ausführen (optional)
 ```bash
