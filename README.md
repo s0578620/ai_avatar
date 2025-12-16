@@ -1,34 +1,81 @@
 # AI-Avatar
 
-RAG-basierter Avatar-Bot mit FastAPI, Celery, Qdrant, Redis, Postgres und n8n.
+A Retrieval-Augmented Generation (RAG) based AI Avatar platform designed for educational use.
+Teachers can manage classes, students, media, and knowledge sources, while students interact with a context-aware AI avatar.
+Gamification and personalization (interests, levels, badges) are built in.
 
-## Setup
+**Tech Stack:** FastAPI · Celery · Redis · Qdrant · PostgreSQL · n8n · Gemini API
 
-Use WSL2 or Docker Desktop with WSL2 backend on Windows.
+---
 
-Erstelle im Projekt-Root eine `.env` (falls nicht vorhanden), z.B.:
+## Architecture Overview
+
+```
+Client (Browser / App)
+        |
+     FastAPI
+        |
+  -------------------------
+  |        |        |     |
+Redis   Celery   Postgres Qdrant
+  |                 |
+n8n Workflows     Media Storage
+        |
+     Gemini API
+```
+
+---
+
+## Requirements
+
+- Docker Desktop with WSL2 backend (Windows) **or**
+- Docker + Docker Compose (Linux / macOS)
+
+---
+
+## Environment Configuration
+
+Create a `.env` file in the project root (if not present):
 
 ```env
+# =========================
+# General
+# =========================
 PYTHONUNBUFFERED=1
 TZ=Europe/Berlin
-
 API_PORT=8000
 
+# =========================
+# Celery / Redis
+# =========================
 CELERY_BROKER_URL=redis://redis:6379/0
 CELERY_RESULT_BACKEND=redis://redis:6379/0
 
+# =========================
+# RAG Settings
+# =========================
 DEFAULT_COLLECTION=avatar_docs
 TOP_K=4
 MAX_HISTORY_MESSAGES=6
 
-GEMINI_API_KEY=DEIN_GEMINI_API_KEY
+# =========================
+# Gemini API (REQUIRED)
+# =========================
+# Never commit real keys!
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 GEMINI_CHAT_MODEL=gemini-2.5-flash
 GEMINI_EMBED_MODEL=text-embedding-004
 
+# =========================
+# n8n
+# =========================
 N8N_HOST=localhost
 N8N_PORT=5678
 N8N_PROTOCOL=http
 
+# =========================
+# Database (PostgreSQL)
+# =========================
 DB_TYPE=postgresdb
 DB_POSTGRESDB_HOST=db
 DB_POSTGRESDB_PORT=5432
@@ -36,306 +83,253 @@ DB_POSTGRESDB_USER=n8n
 DB_POSTGRESDB_PASSWORD=n8n
 DB_POSTGRESDB_DATABASE=n8n
 
-# SQLAlchemy-URL für die User-DB (Teacher / Klassen / Schüler / Interessen)
+# SQLAlchemy URL for user database
 USER_DB_URL=postgresql+psycopg2://n8n:n8n@db:5432/avatar_userdb
 
-# Speicherort für hochgeladene Medien im Container
+# =========================
+# Media Storage
+# =========================
 MEDIA_ROOT=/data/media
 
-# Optional: von den Worker-Tasks verwendete Basis-URL für die User-API
-# (Standard ist http://api:8000)
+# Optional: Base URL used by worker tasks
 # USER_API_BASE=http://api:8000
-```
-
-## Start Project
-```bash
-docker compose up -d --build
-```
-
-UIs: FastAPI http://localhost:8000/docs, n8n http://localhost:5678, Qdrant http://localhost:6333/dashboard
-
-## import Workflows to n8n
-- ./n8n_workflows/Avatar_Data_Ingestion_native_testing_copy.json
-- ./n8n_workflows/Avatar_RAG_Chat_native_testing_copy.json
-
-
-## Healthcheck API
-```bash
-# Basis-Health
-curl -s http://localhost:8000/health
-
-# Qdrant-Verbindung & Collections
-curl -s http://localhost:8000/health/qdrant
-
-# Gemini-Backend
-curl -s http://localhost:8000/health/gemini
 ```
 
 ---
 
-## Direkte RAG API-Nutzung
+## Start the Project
 
-### Ingestion via API
-Minimal:
 ```bash
-curl -X POST "http://localhost:8000/ingest" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Paris ist die Hauptstadt von Frankreich.",
+docker compose up -d --build
+```
+
+⏱ First startup may take **1–3 minutes**.
+
+### Available UIs
+
+- FastAPI Docs: http://localhost:8000/docs
+- n8n: http://localhost:5678
+- Qdrant Dashboard: http://localhost:6333/dashboard
+
+---
+
+## Import n8n Workflows
+
+1. Open http://localhost:5678
+2. Log in to n8n
+3. Import and activate:
+   - `n8n_workflows/Avatar_Data_Ingestion_native_testing_copy.json`
+   - `n8n_workflows/Avatar_RAG_Chat_native_testing_copy.json`
+
+---
+
+## Health Checks
+
+```bash
+# Basic API health
+curl http://localhost:8000/health
+
+# Qdrant connection & collections
+curl http://localhost:8000/health/qdrant
+
+# Gemini backend
+curl http://localhost:8000/health/gemini
+```
+
+---
+
+## Asynchronous API Note
+
+Most endpoints run **asynchronously** using Celery.
+
+They return a `task_id`.  
+Use `/tasks/{task_id}` to retrieve the final result.
+
+---
+
+## RAG API
+
+### Ingest Text
+
+```bash
+curl -X POST "http://localhost:8000/ingest"   -H "Content-Type: application/json"   -d '{
+    "text": "Paris is the capital of France.",
     "collection": "avatar_docs"
   }'
 ```
-Mit doc_id + Metadaten:
+
+With metadata:
+
 ```bash
-curl -X POST "http://localhost:8000/ingest" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Der Fuchs lebt im Wald und ist ein schlaues Tier.",
+curl -X POST "http://localhost:8000/ingest"   -H "Content-Type: application/json"   -d '{
+    "text": "Foxes live in forests and are very clever animals.",
     "collection": "avatar_docs",
     "doc_id": "fox_facts_01",
     "metadata": {
       "class_id": 1,
-      "subject": "Sachkunde",
-      "source": "Arbeitsblatt"
+      "subject": "Science",
+      "source": "Worksheet"
     }
   }'
 ```
 
+Check task status:
+
 ```bash
-Beispiel-Antwort:
-```json
-{
-  "task_id": "cc186c96-eafd-498b-b99d-7589cc96ac53",
-  "collection": "avatar_docs"
-}
+curl http://localhost:8000/tasks/<task_id>
 ```
 
-Task-Status abfragen:
-```bash
-curl "http://localhost:8000/tasks/cc186c96-eafd-498b-b99d-7589cc96ac53"
-```
+---
 
-### RAG Chat via API
+### RAG Chat
+
 ```bash
-curl -X POST "http://localhost:8000/chat" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Kannst du mir etwas Spannendes über den Fuchs erklären?",
+curl -X POST "http://localhost:8000/chat"   -H "Content-Type: application/json"   -d '{
+    "message": "Tell me something interesting about foxes.",
     "session_id": "demo-session-1",
     "collection": "avatar_docs",
     "student_id": 2
   }'
 ```
 
-Beispiel-Antwort:
-```json
-{
-  "task_id": "e92067fe-1e5d-4d12-82ef-c69d64eba742",
-  "collection": "avatar_docs"
-}
-```
-
-Ergebnis abholen:
-```bash
-curl "http://localhost:8000/tasks/e92067fe-1e5d-4d12-82ef-c69d64eba742"
-```
-
 ---
-## UserDb API (Teacher-Student)
 
-### register Teacher
+## User & Class Management API
+
+### Register Teacher
+
 ```bash
-curl -X POST "http://localhost:8000/api/teachers/register" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Demo",
+curl -X POST "http://localhost:8000/api/teachers/register"   -H "Content-Type: application/json"   -d '{
+    "name": "Demo Teacher",
     "email": "demo@example.com",
     "password": "test123"
   }'
 ```
-Beispiel-Antwort:
-```json
-{
-  "name": "Demo",
-  "email": "demo@example.com",
-  "id": 1
-}
-```
+
 ### Teacher Login
+
 ```bash
----
-## Ingestion via Webhook
-```bash
-curl -X POST "http://localhost:8000/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{
+curl -X POST "http://localhost:8000/api/auth/login"   -H "Content-Type: application/json"   -d '{
     "email": "demo@example.com",
     "password": "test123"
   }'
 ```
-Beispiel-Antwort:
-```json
-{
-  "teacher_id": 1
-}
-```
 
-### Klasse anlegen
+---
+
+### Create Class
+
 ```bash
-curl -X POST "http://localhost:8000/api/classes" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Klasse 5A",
+curl -X POST "http://localhost:8000/api/classes"   -H "Content-Type: application/json"   -d '{
+    "name": "Class 5A",
     "teacher_id": 1,
     "grade_level": "5",
-    "subject": "Mathematik"
+    "subject": "Mathematics"
   }'
 ```
-### Klassen auflisten
+
+### List Classes
 
 ```bash
-curl "http://localhost:8000/api/classes"
+curl http://localhost:8000/api/classes
 ```
 
-### Schüler in Klasse anlegen
+---
+
+### Add Student
+
 ```bash
-curl -X POST "http://localhost:8000/api/classes/1/students" \
-  -H "Content-Type: application/json" \
-  -d '{
+curl -X POST "http://localhost:8000/api/classes/1/students"   -H "Content-Type: application/json"   -d '{
     "name": "Max Mustermann",
     "class_id": 1,
     "username": "max1",
-    "password": "geheim123"
+    "password": "secret123"
   }'
 ```
-### Schülerliste als CSV exportieren
+
+### Export Students as CSV
+
 ```bash
-curl "http://localhost:8000/api/classes/1/students/export" \
-  -o class_1_students.csv
+curl http://localhost:8000/api/classes/1/students/export -o students.csv
 ```
 
-### Interessen für Schüler speichern
+---
+
+## Student Profile & Interests
+
 ```bash
-curl -X POST "http://localhost:8000/api/user/interests" \
-  -H "Content-Type: application/json" \
-  -d '{
+curl -X POST "http://localhost:8000/api/user/interests"   -H "Content-Type: application/json"   -d '{
     "student_id": 1,
-    "interest_text": "Mag Tiere und Minecraft"
+    "interest_text": "Likes animals and Minecraft"
   }'
 ```
 
-### User Profile abrufen
 ```bash
-curl "http://localhost:8000/api/user/profile?student_id=1"
+curl http://localhost:8000/api/user/profile?student_id=1
 ```
-## Media API (Datei-Upload für Lehrkräfte)
-Die Media-API erlaubt es Lehrkräften, Dateien (z. B. Bilder) hochzuladen und mit Klassen / Tags zu verknüpfen.  
-Die Dateien werden im Container unter `MEDIA_ROOT` gespeichert (Standard: `/data/media`)
-### Beispiel: Bild-Upload
-```bash
-curl -X POST "http://localhost:8000/api/media/" \
-  -F "teacher_id=1" \
-  -F "class_id=1" \
-  -F "type=image" \
-  -F 'tags=["tiere","fuchs"]' \
-  -F "file=@files_test/fuchs.webp"
 
-Beispiel-Antwort:
-```json
-{
-  "id": 1,
-  "teacher_id": 1,
-  "class_id": 1,
-  "type": "image",
-  "original_filename": "fuchs.webp",
-  "path": "/data/media/009289b429814990b54f3dc3d058df63.webp",
-  "thumbnail_path": null,
-  "tags": ["tiere", "fuchs"],
-  "created_at": "2025-12-16T09:50:42.073747"
-}
+---
 
-```
-### Media-Datei abrufen
-Alle Media-Dateien auflisten:
-```bash
-curl "http://localhost:8000/api/media/"
-```
-Nach Klasse filtern:
-```bash
-curl "http://localhost:8000/api/media/?class_id=1"
-```
-Nach Lehrkraft filtern:
-```bash
-curl "http://localhost:8000/api/media/?teacher_id=1"
-```
-Nach Tags filtern:
-```bash
-curl "http://localhost:8000/api/media/?tags=tiere,fuchs"
-```
-Beispiel Antwort:
-```json
-[
-  {
-    "id": 1,
-    "teacher_id": 1,
-    "class_id": 1,
-    "type": "image",
-    "original_filename": "fuchs.webp",
-    "path": "/data/media/009289b429814990b54f3dc3d058df63.webp",
-    "thumbnail_path": null,
-    "tags": ["tiere", "fuchs"],
-    "created_at": "2025-12-16T09:50:42.073747"
-  }
-]
-```
-Nach Type filtern:
-Image-Dateien:
+## Media API
+
+Teachers can upload files (images, PDFs) and link them to classes and tags.
+
+### Supported Types
+
+- Images: jpg, png, webp
+- Documents: pdf
+- Max file size: 10 MB
+
+### Upload Media
 
 ```bash
-"http://localhost:8000/api/media/?tag=fuchs&type=image"
+curl -X POST "http://localhost:8000/api/media/"   -F "teacher_id=1"   -F "class_id=1"   -F "type=image"   -F 'tags=["animals","fox"]'   -F "file=@files_test/fox.webp"
 ```
-PDF-Dateien:
-```bash
-"http://localhost:8000/api/media/?tag=arbeitsblatt&type=pdf"
-``` 
 
-### Medien löschen
+### List Media
+
 ```bash
-curl -X DELETE "http://localhost:8000/api/media/1"
-``` 
-Beispiel Antwort:
-```json
-[
- {
-   "status": "deleted",
-   "id": 1
- }
-]
+curl http://localhost:8000/api/media/
+curl http://localhost:8000/api/media/?class_id=1
+curl http://localhost:8000/api/media/?teacher_id=1
+curl http://localhost:8000/api/media/?tags=animals,fox
 ```
-[
-  {
-    "id": 1,
-    "teacher_id": 1,
-    "class_id": 1,
 
-## Tests lokal ausführen (optional)
+### Delete Media
+
+```bash
+curl -X DELETE http://localhost:8000/api/media/1
+```
+
+---
+
+## Gamification API
+
+```bash
+curl -X POST "http://localhost:8000/api/gamification/event"   -H "Content-Type: application/json"   -d '{
+    "student_id": 1,
+    "event_type": "ask_question"
+  }'
+```
+
+---
+
+## Running Tests Locally (Optional)
+
 ```bash
 python -m venv .venv
-
-# Linux / macOS
 source .venv/bin/activate
-
-# Windows (PowerShell)
-# .\.venv\Scripts\Activate.ps1
 
 pip install -r services/api/requirements.txt
 pip install -r services/worker/requirements.txt
 pip install pytest requests
 
-# Unit-Tests
+# Unit tests
 pytest -m "not integration"
 
-# Integrationstests (benötigt laufenden Docker-Stack)
+# Integration tests (Docker stack required)
 docker compose up -d
 pytest -m integration
 ```
+
+---
