@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime
 from sqlalchemy.orm import relationship
-
 from .database import Base
 
 
@@ -49,3 +49,40 @@ class StudentInterest(Base):
     interest_text = Column(Text, nullable=False)
 
     student = relationship("Student", back_populates="interests")
+
+
+class Badge(Base):
+    __tablename__ = "badges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(50), unique=True, nullable=False)
+    title = Column(String(100), nullable=False)
+    description = Column(String(255), nullable=True)
+    icon = Column(String(100), nullable=True)
+
+class GamificationEventType(Base):
+    __tablename__ = "gamification_event_types"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(50), unique=True, nullable=False)
+    title = Column(String(100), nullable=False)
+    description = Column(String(255), nullable=True)
+    base_points = Column(Integer, nullable=False, default=0)
+    badge_id = Column(Integer, ForeignKey("badges.id"), nullable=True)
+
+class GamificationState(Base):
+    __tablename__ = "gamification_state"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), unique=True, nullable=False)
+    points = Column(Integer, nullable=False, default=0)
+    level = Column(Integer, nullable=False, default=1)
+
+class StudentBadge(Base):
+    __tablename__ = "student_badges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    badge_id = Column(Integer, ForeignKey("badges.id"), nullable=False)
+    granted_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
+    source_event_key = Column(String(50), nullable=True)

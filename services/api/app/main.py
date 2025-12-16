@@ -9,6 +9,7 @@ from services.shared.rag_core import RAG
 from .userdb.database import init_db
 from .userdb.routes import router as userdb_router
 from .media import router as media_router
+from .gamification import router as gamification_router
 
 # --------------------
 # Celery / RAG Setup
@@ -28,12 +29,12 @@ app = FastAPI(title="Avatar RAG API", version="0.4.0")
 # --------------------
 @app.on_event("startup")
 def startup_event():
-    # Tabellen für Teacher / Class / Student / Interests anlegen
     init_db()
 
 
 app.include_router(userdb_router)
 app.include_router(media_router, prefix="/api")
+app.include_router(gamification_router, prefix="/api")
 
 # --------------------
 # Schemas
@@ -49,7 +50,6 @@ class ChatIn(BaseModel):
     message: str
     session_id: str = "default"
     collection: str | None = None
-    # Nur noch student_id – Profil zieht sich der Worker selbst per HTTP
     student_id: int | None = None
 
 
