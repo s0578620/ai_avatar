@@ -64,6 +64,10 @@ class StudentOut(StudentBase):
     class Config:
         from_attributes = True
 
+class StudentLogin(BaseModel):
+    username: str
+    password: str
+
 
 # ---------- Interests ----------
 
@@ -87,3 +91,5 @@ class UserProfile(BaseModel):
     class_id: int
     class_name: str
     interests: List[str]
+
+

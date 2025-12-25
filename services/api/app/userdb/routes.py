@@ -116,7 +116,27 @@ def register_teacher(
     db.refresh(teacher)
     return teacher
 
+# ---------- Student ----------
+@router.post("/auth/student-login")
+def student_login(
+    payload: schemas.StudentLogin,
+    db: Session = Depends(get_db),
+):
+    student = (
+        db.query(models.Student)
+        .filter(models.Student.username == payload.username)
+        .first()
+    )
+    if not student or not verify_password(payload.password, student.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
 
+    return {
+        "student_id": student.id,
+        "class_id": student.class_id,
+    }
 @router.post("/auth/login")
 def login_teacher(
         payload: schemas.TeacherLogin,
