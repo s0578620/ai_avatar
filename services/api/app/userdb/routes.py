@@ -1,17 +1,93 @@
 from io import StringIO
 import csv
+import secrets
+import hashlib
+from datetime import datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
 from . import models, schemas
 from .database import get_db
 from .security import hash_password, verify_password
+from .models import Teacher, PasswordResetToken
 
 router = APIRouter(prefix="/api")
+
+class PasswordResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+@router.post("/auth/request-password-reset")
+def request_password_reset(
+    payload: PasswordResetRequestIn,
+    db: Session = Depends(get_db),
+):
+    # Immer 200 zurückgeben -> kein User-Enumeration
+    teacher = (
+        db.query(Teacher)
+        .filter(Teacher.email == payload.email)
+        .first()
+    )
+    if not teacher:
+        return {"status": "ok"}
+
+    # zufälligen Token generieren (raw) und gehasht speichern
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+    reset = PasswordResetToken(
+        teacher_id=teacher.id,
+        token_hash=token_hash,
+        expires_at=datetime.utcnow() + timedelta(hours=1),
+    )
+    db.add(reset)
+    db.commit()
+
+    # TODO: In echt -> E-Mail über n8n verschicken.
+    # Für Demo/Entwicklung: Token in der Response zurückgeben
+    return {
+        "status": "ok",
+        "reset_token": raw_token,  # NUR für Demo!
+    }
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/auth/reset-password")
+def reset_password(
+    payload: PasswordResetConfirmIn,
+    db: Session = Depends(get_db),
+):
+    token_hash = hashlib.sha256(payload.token.encode("utf-8")).hexdigest()
+
+    reset = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token_hash == token_hash)
+        .first()
+    )
+    if (
+        not reset
+        or reset.used_at is not None
+        or reset.expires_at < datetime.utcnow()
+    ):
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    teacher = db.get(Teacher, reset.teacher_id)
+    if not teacher:
+        raise HTTPException(status_code=400, detail="Invalid token")
+
+    # vorhandene Hilfsfunktion nutzen
+    teacher.password_hash = hash_password(payload.new_password)
+    reset.used_at = datetime.utcnow()
+
+    db.commit()
+    return {"status": "ok"}
 
 # ---------- Teacher ----------
 

@@ -215,6 +215,49 @@ curl -X POST "http://localhost:8000/api/auth/login"   -H "Content-Type: applicat
   }'
 ```
 
+### request Reset Password
+```bash
+curl -X POST "http://localhost:8000/api/auth/request-password-reset" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "demo@example.com"
+  }'
+```
+Example Response(ONLY IN DEV-MODE!):
+```json
+{
+  "status": "ok",
+  "reset_token": "SOME_RESET_TOKEN"
+}
+```
+
+### Set New Password
+```bash
+curl -X POST "http://localhost:8000/api/auth/reset-password" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "SOME_RESET_TOKEN",
+    "new_password": "neuesPasswort123"
+  }'
+```
+
+Example Response:
+```json
+{
+  "status": "ok"
+}
+```
+### Teacher Resert Password
+
+```bash
+curl -X POST "http://localhost:8000/api/auth/request-password-reset" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "demo@example.com"
+  }'
+```
+
+B
 ---
 
 ### Create Class
