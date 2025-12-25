@@ -1,14 +1,15 @@
 import os
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import List, Optional
 from celery import Celery
 from celery.result import AsyncResult
-
+from fastapi.staticfiles import StaticFiles
 from services.shared.rag_core import RAG
 from .userdb.database import init_db
 from .userdb.routes import router as userdb_router
-from .media import router as media_router
+from .media import router as media_router, MEDIA_ROOT
 from .gamification import router as gamification_router
 
 # --------------------
@@ -35,6 +36,7 @@ def startup_event():
 app.include_router(userdb_router)
 app.include_router(media_router, prefix="/api")
 app.include_router(gamification_router, prefix="/api")
+app.mount("/media-files", StaticFiles(directory=MEDIA_ROOT), name="media-files")
 
 # --------------------
 # Schemas
@@ -51,6 +53,36 @@ class ChatIn(BaseModel):
     session_id: str = "default"
     collection: str | None = None
     student_id: int | None = None
+
+# --------------------
+# Lesson Plan Schemas
+# --------------------
+
+class LessonStep(BaseModel):
+    id: str
+    phase: str
+    title: str
+    description: str
+    start_minute: int
+    end_minute: int
+    media_tags: List[str] = Field(default_factory=list)
+    media_ids: List[int] = Field(default_factory=list)
+
+
+class LessonPlanIn(BaseModel):
+    topic: str
+    duration_minutes: int = Field(..., ge=5, le=180)
+    grade_level: Optional[str] = None
+    class_id: Optional[int] = None
+    teacher_id: Optional[int] = None
+
+
+class LessonPlanOut(BaseModel):
+    topic: str
+    duration_minutes: int
+    grade_level: Optional[str]
+    class_id: Optional[int] = None
+    steps: List[LessonStep]
 
 
 # --------------------
@@ -122,6 +154,17 @@ def chat(payload: ChatIn):
     )
     return {"task_id": task.id, "collection": collection}
 
+@app.post("/lesson-planner")
+def lesson_planner(payload: LessonPlanIn):
+    """
+    Startet asynchron die Generierung eines Unterrichtsplans.
+    Ergebnis wird über /tasks/{task_id} abgeholt.
+    """
+    task = celery.send_task(
+        "tasks.generate_lesson_plan",
+        args=[payload.model_dump()],
+    )
+    return {"task_id": task.id}
 
 @app.get("/tasks/{task_id}")
 def get_status(task_id: str):

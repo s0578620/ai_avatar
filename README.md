@@ -215,7 +215,7 @@ curl -X POST "http://localhost:8000/api/auth/login"   -H "Content-Type: applicat
   }'
 ```
 
-### request Reset Password
+### Request Password Reset (Teacher)
 ```bash
 curl -X POST "http://localhost:8000/api/auth/request-password-reset" \
   -H "Content-Type: application/json" \
@@ -231,7 +231,7 @@ Example Response(ONLY IN DEV-MODE!):
 }
 ```
 
-### Set New Password
+### Set New Password (Teacher)
 ```bash
 curl -X POST "http://localhost:8000/api/auth/reset-password" \
   -H "Content-Type: application/json" \
@@ -349,10 +349,11 @@ curl -X POST "http://localhost:8000/api/media/"   -F "teacher_id=1"   -F "class_
 ### List Media
 
 ```bash
-curl http://localhost:8000/api/media/
-curl http://localhost:8000/api/media/?class_id=1
-curl http://localhost:8000/api/media/?teacher_id=1
-curl http://localhost:8000/api/media/?tags=animals,fox
+curl "http://localhost:8000/api/media/"
+curl "http://localhost:8000/api/media/?class_id=1"
+curl "http://localhost:8000/api/media/?teacher_id=1"
+curl "http://localhost:8000/api/media/?tag=fox"
+curl "http://localhost:8000/api/media/?tag=fox&type=image"
 ```
 
 ### Delete Media
@@ -374,6 +375,64 @@ curl -X POST "http://localhost:8000/api/gamification/event"   -H "Content-Type: 
 
 ---
 
+## Lesson Plan API
+
+### Request Lesson Plan
+
+```bash
+### Request
+
+```bash
+curl -X POST "http://localhost:8000/lesson-planner" \
+  -H "Content-Type: application/json" \
+  --data-binary @- << 'EOF'
+{
+  "topic": "Füchse im Wald",
+  "duration_minutes": 45,
+  "grade_level": "5",
+  "class_id": 1
+}
+EOF
+```
+### Response
+
+```json
+{
+  "task_id": "..."
+}
+```
+
+### Check Result
+
+```bash
+curl http://localhost:8000/tasks/<task_id>
+```
+Example Response:
+```json
+{
+  "topic": "Füchse im Wald",
+  "duration_minutes": 45,
+  "grade_level": "5",
+  "class_id": 1,
+  "steps": [
+    {
+      "id": "intro",
+      "phase": "Einstieg",
+      "title": "Einstieg ins Thema Füchse",
+      "description": "2–3 erklärende Sätze auf Deutsch ...",
+      "start_minute": 0,
+      "end_minute": 10,
+      "media_tags": ["tiere", "fuchs"],
+      "media_ids": [1, 3]
+    }
+  ]
+}
+
+
+```
+
+
+---
 ## Running Tests Locally (Optional)
 
 ```bash

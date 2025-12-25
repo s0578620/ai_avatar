@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any, List
 import requests
 from celery import Celery
 from redis import Redis
@@ -164,3 +164,112 @@ def chat_with_rag(
         raise RuntimeError(
             f"Chat failed for session '{session_id}' in collection '{collection}': {e}"
         ) from e
+
+@celery.task(name="tasks.generate_lesson_plan")
+def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generiert einen Unterrichtsplan mit Gemini und verknüpft passende Media-IDs
+    über die Media-API (/api/media).
+    """
+    rag = RAG()
+
+    topic = payload["topic"]
+    duration = payload["duration_minutes"]
+    grade_level = payload.get("grade_level") or "unknown"
+
+    # ---------- 1) Prompt für Gemini ----------
+    prompt = f"""
+    You are a helpful lesson planning assistant for German teachers.
+
+    Create a lesson plan based on:
+    - Topic: "{topic}"
+    - Duration: {duration} minutes
+    - Grade level: {grade_level}
+
+    Return your answer as VALID JSON ONLY.
+    - No Markdown
+    - No backticks
+    - No comments
+    - No text before or after the JSON
+
+    Use exactly this schema:
+
+    {{
+      "steps": [
+        {{
+          "id": "intro",
+          "phase": "Einstieg",
+          "title": "Short title",
+          "description": "2-3 sentences in German, suitable for students.",
+          "start_minute": 0,
+          "end_minute": 10,
+          "media_tags": ["tiere", "fuchs"]
+        }}
+      ]
+    }}
+
+    Rules:
+    - Use 3–6 steps.
+    - "phase" must be one of: "Einstieg", "Erarbeitung", "Sicherung", "Abschluss".
+    - "media_tags" is a list of simple lowercase keywords.
+        """.strip()
+
+    raw = rag.generate(prompt)
+    logger.info("Lesson planner raw output: %s", raw)
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        logger.warning("Could not parse lesson planner JSON: %s; raw=%r", e, raw)
+        # Fallback: Minimaler Plan
+        data = {
+            "steps": [
+                {
+                    "id": "main",
+                    "phase": "Erarbeitung",
+                    "title": f"Arbeit zum Thema {topic}",
+                    "description": "Einfache Arbeitsphase, automatisch erzeugter Fallback.",
+                    "start_minute": 0,
+                    "end_minute": duration,
+                    "media_tags": [],
+                }
+            ]
+        }
+
+    steps: List[Dict[str, Any]] = data.get("steps", [])
+
+    api_base = os.getenv("USER_API_BASE", "http://api:8000")
+
+    def fetch_media_ids_for_tags(tags: List[str]) -> List[int]:
+        ids: List[int] = []
+        for tag in tags:
+            try:
+                resp = requests.get(
+                    f"{api_base}/api/media",
+                    params={"tag": tag},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    for item in resp.json():
+                        mid = item.get("id")
+                        if isinstance(mid, int) and mid not in ids:
+                            ids.append(mid)
+            except Exception:
+                continue
+        return ids
+
+    enriched_steps: List[Dict[str, Any]] = []
+
+    for step in steps:
+        tags = step.get("media_tags") or []
+        media_ids = fetch_media_ids_for_tags(tags)
+        step["media_ids"] = media_ids
+        enriched_steps.append(step)
+
+    return {
+        "topic": topic,
+        "duration_minutes": duration,
+        "grade_level": grade_level,
+        "class_id": payload.get("class_id"),
+        "steps": enriched_steps,
+    }
