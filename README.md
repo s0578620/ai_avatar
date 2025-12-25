@@ -241,10 +241,27 @@ curl -X POST "http://localhost:8000/api/auth/reset-password" \
   }'
 ```
 
-Example Response:
+### Student Login
+
+```bash
+curl -X POST "http://localhost:8000/api/auth/student-login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "max1",
+    "password": "geheim123"
+  }'
+```
+Example Response (Success):
 ```json
 {
-  "status": "ok"
+  "student_id": 1,
+  "class_id": 1
+}
+```
+Example Response (Invalid Credentials):
+```json
+{
+  "detail": "Invalid credentials"
 }
 ```
 ### Teacher Resert Password
