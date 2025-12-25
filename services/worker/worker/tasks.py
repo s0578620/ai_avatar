@@ -242,34 +242,56 @@ def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     def fetch_media_ids_for_tags(tags: List[str]) -> List[int]:
         ids: List[int] = []
+
         for tag in tags:
+            resp = None
+
             try:
                 resp = requests.get(
                     f"{api_base}/api/media",
                     params={"tag": tag},
                     timeout=5,
                 )
-                if resp.status_code == 200:
-                    for item in resp.json():
-                        mid = item.get("id")
-                        if isinstance(mid, int) and mid not in ids:
-                            ids.append(mid)
-            except Exception:
+            except requests.RequestException as exc:
+                logger.warning(
+                    "fetch_media_ids_for_tags: request failed for tag %r: %s",
+                    tag,
+                    exc,
+                )
+
+            if resp is None:
                 continue
+
+            if resp.status_code != 200:
+                logger.warning(
+                    "fetch_media_ids_for_tags: non-200 (%s) for tag %r",
+                    resp.status_code,
+                    tag,
+                )
+                continue
+
+            try:
+                items = resp.json()
+            except ValueError as exc:
+                logger.warning(
+                    "fetch_media_ids_for_tags: invalid JSON for tag %r: %s",
+                    tag,
+                    exc,
+                )
+                continue
+
+            if not isinstance(items, list):
+                logger.warning(
+                    "fetch_media_ids_for_tags: unexpected JSON type %r for tag %r",
+                    type(items),
+                    tag,
+                )
+                continue
+
+            for item in items:
+                mid = item.get("id")
+                if isinstance(mid, int) and mid not in ids:
+                    ids.append(mid)
+
         return ids
 
-    enriched_steps: List[Dict[str, Any]] = []
-
-    for step in steps:
-        tags = step.get("media_tags") or []
-        media_ids = fetch_media_ids_for_tags(tags)
-        step["media_ids"] = media_ids
-        enriched_steps.append(step)
-
-    return {
-        "topic": topic,
-        "duration_minutes": duration,
-        "grade_level": grade_level,
-        "class_id": payload.get("class_id"),
-        "steps": enriched_steps,
-    }
