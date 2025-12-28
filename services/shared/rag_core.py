@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 from typing import List, Optional, Dict, Any
 
 from qdrant_client import QdrantClient
@@ -14,14 +15,24 @@ from qdrant_client.http.models import (
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import google.generativeai as genai
 
+logger = logging.getLogger(__name__)
+
 # --- Konfiguration aus Umgebungsvariablen ---
 DEFAULT_PERSONA = (
     "You are an educational assistant for children between 8 and 13."
     "Explain things kindly and clearly, using simple language and concrete examples."
 )
 
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-genai.configure(api_key=GEMINI_API_KEY)
+# NICHT mehr os.environ["..."], sondern os.getenv + Warnung
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    logger.warning(
+        "GEMINI_API_KEY is not set. Gemini calls (embeddings/chat) will fail "
+        "until you configure it. See README for setup."
+    )
 
 CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
 EMB_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
@@ -40,6 +51,12 @@ class RAG:
         Erzeugt für jeden Text einen Embedding-Vektor mit Gemini.
         EMB_MODEL = 'text-embedding-004' liefert 768-dimensionale Vektoren.
         """
+        if not GEMINI_API_KEY:
+            raise RuntimeError(
+                "GEMINI_API_KEY is not set. Cannot create embeddings. "
+                "Set the environment variable GEMINI_API_KEY (see README)."
+            )
+
         out: List[List[float]] = []
         for t in texts:
             if not t:
@@ -95,10 +112,10 @@ class RAG:
         return len(points)
 
     def search(
-            self,
-            collection: str,
-            query: str,
-            filters: Optional[Dict[str, Any]] = None,
+        self,
+        collection: str,
+        query: str,
+        filters: Optional[Dict[str, Any]] = None,
     ):
         q_vec = self._embed([query])[0]
 
@@ -141,6 +158,12 @@ class RAG:
         """
         Ruft das Chatmodell von Gemini auf.
         """
+        if not GEMINI_API_KEY:
+            raise RuntimeError(
+                "GEMINI_API_KEY is not set. Cannot call Gemini model. "
+                "Set the environment variable GEMINI_API_KEY (see README)."
+            )
+
         model = genai.GenerativeModel(CHAT_MODEL)
         resp = model.generate_content(prompt)
 
@@ -149,10 +172,10 @@ class RAG:
     # --------- Promptbau ---------
 
     def build_prompt(
-            self,
-            question: str,
-            contexts: List[str],
-            persona: str | None = None,
+        self,
+        question: str,
+        contexts: List[str],
+        persona: str | None = None,
     ) -> str:
         # Wenn keine Persona mitgegeben wird, nimm die Standard-Persona
         persona_text = persona or DEFAULT_PERSONA

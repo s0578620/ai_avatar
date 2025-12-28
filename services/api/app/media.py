@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .userdb.database import Base, get_db
 
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "./data/media"))
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "data/media"))
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 try:

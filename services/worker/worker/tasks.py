@@ -7,11 +7,21 @@ from celery import Celery
 from redis import Redis
 from services.shared.rag_core import RAG
 
+from pathlib import Path
+from uuid import uuid4
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
 BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
 MAX_HISTORY = int(os.getenv("MAX_HISTORY_MESSAGES", "6"))
 
 USER_API_BASE = os.getenv("USER_API_BASE", "http://api:8000")
+
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "data/media"))
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 celery = Celery("worker", broker=BROKER_URL, backend=RESULT_BACKEND)
 rag = RAG()
@@ -295,3 +305,62 @@ def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         return ids
 
+    enriched_steps: List[Dict[str, Any]] = []
+
+    for step in steps:
+        tags = step.get("media_tags") or []
+        media_ids = fetch_media_ids_for_tags(tags)
+        step["media_ids"] = media_ids
+        enriched_steps.append(step)
+
+    return {
+        "topic": topic,
+        "duration_minutes": duration,
+        "grade_level": grade_level,
+        "class_id": payload.get("class_id"),
+        "steps": enriched_steps,
+    }
+
+@celery.task(name="tasks.generate_pdf_from_json")
+def generate_pdf_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Nimmt ein einfaches Worksheet-JSON entgegen und erzeugt ein PDF.
+    Speichert es in MEDIA_ROOT und liefert eine Download-URL zurück.
+    Erwartetes Payload-Schema:
+    {
+      "title": "Arbeitsblatt: ...",
+      "tasks": [
+        {"question": "Frage 1"},
+        {"question": "Frage 2"}
+      ]
+    }
+    """
+    title = payload.get("title", "Arbeitsblatt")
+    tasks = payload.get("tasks") or []
+
+    filename = f"worksheet_{uuid4().hex}.pdf"
+    filepath = MEDIA_ROOT / filename
+
+    styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(str(filepath), pagesize=A4)
+
+    story = []
+    # Header
+    story.append(Paragraph(title, styles["Heading1"]))
+    story.append(Spacer(1, 18))
+
+    # Aufgaben
+    for idx, task in enumerate(tasks, start=1):
+        question = task.get("question") or task.get("text") or ""
+        if not question:
+            continue
+        story.append(Paragraph(f"{idx}. {question}", styles["Normal"]))
+        story.append(Spacer(1, 12))
+
+    doc.build(story)
+
+    return {
+        "pdf_filename": filename,
+        "pdf_url": f"/media-files/{filename}",
+        "pdf_path": str(filepath),
+    }

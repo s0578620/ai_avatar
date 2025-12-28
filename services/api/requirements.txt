@@ -13,3 +13,4 @@ passlib>=1.7.4
 python-dotenv
 email-validator
 python-multipart
+pypdf>=5.0.0
