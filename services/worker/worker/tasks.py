@@ -20,7 +20,7 @@ MAX_HISTORY = int(os.getenv("MAX_HISTORY_MESSAGES", "6"))
 
 USER_API_BASE = os.getenv("USER_API_BASE", "http://api:8000")
 
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/data/media"))
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "data/media"))
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 celery = Celery("worker", broker=BROKER_URL, backend=RESULT_BACKEND)
