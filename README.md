@@ -274,7 +274,7 @@ curl -X POST "http://localhost:8000/api/auth/request-password-reset" \
   }'
 ```
 
-B
+
 ---
 
 ### Create Class
@@ -343,7 +343,12 @@ Teachers can upload files (images, PDFs) and link them to classes and tags.
 ### Upload Media
 
 ```bash
-curl -X POST "http://localhost:8000/api/media/"   -F "teacher_id=1"   -F "class_id=1"   -F "type=image"   -F 'tags=["animals","fox"]'   -F "file=@files_test/fox.webp"
+curl -X POST "http://localhost:8000/api/media/" \
+  -F "teacher_id=1" \
+  -F "class_id=1" \
+  -F "type=image" \
+  -F 'tags=["animals","fox"]' \
+  -F "file=@files_test/fox.webp"
 ```
 
 ### List Media
@@ -363,6 +368,11 @@ curl -X DELETE http://localhost:8000/api/media/1
 ```
 
 ---
+### Access Media File
+
+```bash
+http://localhost:8000/media-files/<filename>
+```
 
 ## Gamification API
 
@@ -380,7 +390,6 @@ curl -X POST "http://localhost:8000/api/gamification/event"   -H "Content-Type: 
 ### Request Lesson Plan
 
 ```bash
-### Request
 
 ```bash
 curl -X POST "http://localhost:8000/lesson-planner" \

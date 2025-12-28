@@ -1,6 +1,7 @@
 import os
+from io import BytesIO
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from celery import Celery
@@ -11,6 +12,11 @@ from .userdb.database import init_db
 from .userdb.routes import router as userdb_router
 from .media import router as media_router, MEDIA_ROOT
 from .gamification import router as gamification_router
+
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
 
 # --------------------
 # Celery / RAG Setup
@@ -85,6 +91,13 @@ class LessonPlanOut(BaseModel):
     steps: List[LessonStep]
 
 
+class WorksheetTask(BaseModel):
+    question: str
+
+class WorksheetIn(BaseModel):
+    title: str
+    tasks: List[WorksheetTask]
+
 # --------------------
 # Health-Endpoints
 # --------------------
@@ -138,6 +151,59 @@ def ingest(payload: IngestIn):
     )
     return {"task_id": task.id, "collection": collection}
 
+@app.post("/ingest-file")
+async def ingest_file(
+    file: UploadFile = File(...),
+    collection: Optional[str] = Form(None),
+    doc_id: Optional[str] = Form(None),
+    class_id: Optional[int] = Form(None),
+    teacher_id: Optional[int] = Form(None),
+):
+    raw = await file.read()
+
+    filename = file.filename or "upload"
+    ext = os.path.splitext(filename)[1].lower()
+    content_type = file.content_type or ""
+
+    try:
+        if ext == ".pdf" or content_type == "application/pdf":
+            text = extract_text_from_pdf(raw)
+        elif ext in {".txt", ".md"} or content_type.startswith("text/"):
+            text = raw.decode("utf-8", errors="ignore")
+        else:
+            raise HTTPException(
+                status_code=415,
+                detail=f"Unsupported file type: {ext or content_type}",
+            )
+    except RuntimeError as e:
+        # z.B. pypdf fehlt
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        # z.B. kaputtes PDF
+        raise HTTPException(
+            status_code=400, detail=f"Could not extract text from file: {e}"
+        ) from e
+
+    meta: dict = {
+        "filename": filename,
+        "class_id": class_id,
+        "teacher_id": teacher_id,
+        "source": "file_upload",
+    }
+    # None-Werte entfernen
+    meta = {k: v for k, v in meta.items() if v is not None}
+
+    coll = collection or DEFAULT_COLLECTION
+    task = celery.send_task(
+        "tasks.ingest_text",
+        args=[
+            text,
+            coll,
+            doc_id or filename,
+            meta,
+        ],
+    )
+    return {"task_id": task.id, "collection": coll}
 
 @app.post("/chat")
 def chat(payload: ChatIn):
@@ -166,6 +232,19 @@ def lesson_planner(payload: LessonPlanIn):
     )
     return {"task_id": task.id}
 
+@app.post("/worksheet/pdf")
+def create_worksheet_pdf(payload: WorksheetIn):
+    """
+    Startet asynchron die PDF-Erzeugung für ein Arbeitsblatt.
+    Ergebnis (pdf_url) wird über /tasks/{task_id} abgeholt.
+    """
+    task = celery.send_task(
+        "tasks.generate_pdf_from_json",
+        args=[payload.model_dump()],
+    )
+    return {"task_id": task.id}
+
+
 @app.get("/tasks/{task_id}")
 def get_status(task_id: str):
     res: AsyncResult = celery.AsyncResult(task_id)
@@ -175,3 +254,17 @@ def get_status(task_id: str):
     elif res.failed():
         data["error"] = str(res.result)
     return data
+
+def extract_text_from_pdf(data: bytes) -> str:
+    if PdfReader is None:
+        raise RuntimeError("PDF support not installed. Add 'pypdf' to requirements.txt.")
+
+    reader = PdfReader(BytesIO(data))
+    parts: list[str] = []
+
+    for page in reader.pages:
+        text = page.extract_text() or ""
+        if text.strip():
+            parts.append(text)
+
+    return "\n\n".join(parts).strip()
