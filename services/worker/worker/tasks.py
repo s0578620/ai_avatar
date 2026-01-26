@@ -2,7 +2,7 @@ import os
 import json
 import logging
 from typing import Optional, Dict, Any, List
-
+import re
 import requests
 from celery import Celery
 from redis import Redis
@@ -57,6 +57,14 @@ def _strip_code_fences(raw: str) -> str:
 
         raw = "\n".join(lines).strip()
     return raw
+
+def _strip_leading_role_label(text: str) -> str:
+    return re.sub(
+        r'^\s*(ASSISTENT|ASSISTANT|Avatar)\s*[:\-]\s*',
+        '',
+        text,
+        flags=re.IGNORECASE,
+    )
 
 def _hkey(sid: str) -> str:
     return f"chat:{sid}"
@@ -190,6 +198,7 @@ def chat_with_rag(
 
         prompt = rag.build_prompt(prompt_input, contexts)
         answer = rag.generate(prompt)
+        answer = _strip_leading_role_label(answer or "")
 
         _append(session_id, "user", message)
         _append(session_id, "assistant", answer)

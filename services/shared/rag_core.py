@@ -78,7 +78,7 @@ class RAG:
         names = [c.name for c in collections]
         if name not in names:
             self.client.create_collection(
-                name=name,
+                collection_name=name,
                 vectors_config=VectorParams(
                     size=size,
                     distance=Distance.COSINE,
