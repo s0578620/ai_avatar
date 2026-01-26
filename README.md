@@ -332,6 +332,15 @@ curl -X POST "http://localhost:8000/api/classes/1/students" \
   }'
 ```
 
+#### Delete student
+Only teachers may delete students – and only if they are the class teacher of that student’s class.
+```bash
+curl -X DELETE "http://localhost:8000/api/user/student/42?teacher_id=1"
+```
+student_id – path parameter (here: 42)
+teacher_id – query parameter; must match class.teacher_id of the student's class
+If the teacher does not own the class, the API responds with 403 Not allowed to delete this student.
+
 #### Export students as CSV
 
 ```bash
