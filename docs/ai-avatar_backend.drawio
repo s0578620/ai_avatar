@@ -1,0 +1,295 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.0.3 Chrome/140.0.7339.249 Electron/38.7.0 Safari/537.36" version="29.0.3" pages="3">
+  <diagram id="arch-1" name="Architecture">
+    <mxGraphModel dx="1414" dy="817" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c1" value="Client&#xa;(Browser / App)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="295" y="30" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="FastAPI&#xa;services/api" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="280" y="120" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" value="Redis&#xa;Broker + Result Backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+          <mxGeometry x="10" y="300" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="worker" value="Celery Worker&#xa;services/worker" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="490" y="280" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="qdrant" value="Qdrant&#xa;Vector DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+          <mxGeometry x="530" y="420" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="postgres" value="PostgreSQL&#xa;db (avatar_userdb + n8n)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="280" y="500" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="media" value="Media Storage Volume&#xa;./data/media ↔ /data/media" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" parent="1" vertex="1">
+          <mxGeometry x="620" y="120" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="n8n" value="n8n&#xa;Workflows (optional email, ingestion)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry y="610" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="gemini" value="Gemini API&#xa;(embeddings + chat)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="920" y="40" width="200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="HTTP" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="c1" target="api" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="SQLAlchemy (UserDB)" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="api" target="postgres" edge="1">
+          <mxGeometry x="0.4" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="Upload/Serve media" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="api" target="media" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="enqueue tasks" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="api" target="redis" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="u" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="worker" target="redis" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="630" y="240" />
+              <mxPoint x="150" y="240" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="vector upsert/search" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="worker" target="qdrant" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="embed + generate" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="worker" target="gemini" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="fetch profile / media&#xa;(HTTP)" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="539.9999999999998" y="320.0344827586207" as="sourcePoint" />
+            <mxPoint x="390.0000000000002" y="199.9999999999999" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="Postgres (n8n DB)" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="n8n" target="postgres" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="erd-1" name="UserDB">
+    <mxGraphModel dx="2066" dy="1201" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t_teachers" value="&lt;b&gt;teachers&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;name&lt;br&gt;email (unique)&lt;br&gt;password_hash" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="20" y="35" width="240" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="t_classes" value="&lt;b&gt;classes&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;name&lt;br&gt;teacher_id (FK → teachers.id)&lt;br&gt;grade_level&lt;br&gt;subject" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="330" y="30" width="260" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="t_students" value="&lt;b&gt;students&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;name&lt;br&gt;class_id (FK → classes.id)&lt;br&gt;username (unique)&lt;br&gt;password_hash" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="650" y="25" width="280" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="t_student_interests" value="&lt;b&gt;student_interests&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;student_id (FK → students.id)&lt;br&gt;interest_text (TEXT)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="840" y="240" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="t_password_reset" value="&lt;b&gt;password_reset_tokens&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;teacher_id (FK → teachers.id)&lt;br&gt;token_hash (indexed)&lt;br&gt;expires_at&lt;br&gt;used_at (nullable)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry y="240" width="280" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="t_badges" value="&lt;b&gt;badges&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;key (unique)&lt;br&gt;title&lt;br&gt;description&lt;br&gt;icon" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry y="490" width="240" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="t_event_types" value="&lt;b&gt;gamification_event_types&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;key (unique)&lt;br&gt;title&lt;br&gt;description&lt;br&gt;base_points&lt;br&gt;badge_id (FK → badges.id, nullable)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="370" y="240" width="320" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="t_gam_state" value="&lt;b&gt;gamification_state&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;student_id (FK → students.id, unique)&lt;br&gt;points&lt;br&gt;level" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="840" y="430" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="t_student_badges" value="&lt;b&gt;student_badges&lt;/b&gt;&lt;br&gt;id (PK)&lt;br&gt;student_id (FK → students.id)&lt;br&gt;badge_id (FK → badges.id)&lt;br&gt;granted_at&lt;br&gt;source_event_key (nullable)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="630" y="570" width="320" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="r_teacher_classes" value="1..*" style="startArrow=ERone;endArrow=ERmany;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_teachers" target="t_classes" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r_class_students" value="1..*" style="startArrow=ERone;endArrow=ERmany;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_classes" target="t_students" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r_student_interests" value="1..*" style="startArrow=ERone;endArrow=ERmany;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_students" target="t_student_interests" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r_teacher_reset" value="1..*" style="startArrow=ERone;endArrow=ERmany;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_teachers" target="t_password_reset" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r_student_state" value="1..1" style="startArrow=ERone;endArrow=ERone;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_students" target="t_gam_state" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="790" y="390" />
+              <mxPoint x="980" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="r_badge_eventtypes" value="0..* (badge_id nullable)" style="startArrow=ERone;endArrow=ERzeroToMany;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_badges" target="t_event_types" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r_student_badges_student" value="1..*" style="startArrow=ERone;endArrow=ERmany;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_students" target="t_student_badges" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r_student_badges_badge" value="1..*" style="startArrow=ERone;endArrow=ERmany;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_badges" target="t_student_badges" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r_student_badges_eventtype" value="source_event_key ↔ event_types.key (logical)" style="dashed=1;endArrow=open;html=1;edgeStyle=orthogonalEdgeStyle;" parent="1" source="t_student_badges" target="t_event_types" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="IH8om-RzDCijMlwvKYSr" name="API Flows">
+    <mxGraphModel dx="2066" dy="1201" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-1" value="Client" style="swimlane;rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="240" height="920" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-2" value="POST /chat&#xa;{message, session_id, collection, student_id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-1">
+          <mxGeometry x="10" y="30" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-3" value="poll /tasks/&lt;task_id&gt;&#xa;→ answer + scores + documents" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-1">
+          <mxGeometry x="20" y="180" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-4" value="POST /ingest&#xa;{text, collection, doc_id, metadata}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-1">
+          <mxGeometry x="20" y="330" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-5" value="POST /lesson-planner&#xa;{topic, duration, grade_level, class_id}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-1">
+          <mxGeometry x="20" y="470" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-6" value="POST /pdf&#xa;{title, tasks[]}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-1">
+          <mxGeometry x="20" y="670" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-7" value="API (FastAPI)" style="swimlane;rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="300" y="80" width="330" height="920" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-8" value="enqueue celery: tasks.chat_with_rag&#xa;return task_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-7">
+          <mxGeometry x="20" y="90" width="280" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-9" value="GET /api/user/profile?student_id=…&#xa;(optional)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-7">
+          <mxGeometry x="20" y="170" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-10" value="enqueue: tasks.ingest_text&#xa;return task_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-7">
+          <mxGeometry x="20" y="335" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-11" value="enqueue: tasks.generate_lesson_plan&#xa;return task_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-7">
+          <mxGeometry x="20" y="475" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-12" value="GET /api/media?tag=…&#xa;→ media IDs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-7">
+          <mxGeometry x="10" y="580" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-13" value="enqueue: tasks.generate_pdf_from_json&#xa;return task_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;dashed=1;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-7">
+          <mxGeometry x="20" y="670" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-14" value="Worker (Celery)" style="swimlane;rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="650" y="80" width="330" height="920" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-15" value="consume task&#xa;chat_with_rag()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-14">
+          <mxGeometry x="25" y="130" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-16" value="split_text → chunks&#xa;embed chunks (Gemini)&#xa;upsert to Qdrant" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-14">
+          <mxGeometry x="20" y="320" width="280" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-17" value="Gemini → JSON steps&#xa;fetch media IDs by tag via API&#xa;return enriched plan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-14">
+          <mxGeometry x="20" y="460" width="280" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-18" value="reportlab build PDF&#xa;save to MEDIA_ROOT&#xa;return {pdf_url}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;dashed=1;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-14">
+          <mxGeometry x="20" y="660" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-19" value="External (Redis/Qdrant/Gemini/Media)" style="swimlane;rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="80" width="360" height="920" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-20" value="Qdrant search(collection, query)&#xa;→ context chunks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-19">
+          <mxGeometry x="40" y="80" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-21" value="Gemini generate(prompt)&#xa;→ answer text" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-19">
+          <mxGeometry x="40" y="150" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-22" value="write history (Redis db1)&#xa;append user+assistant" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-19">
+          <mxGeometry x="40" y="230" width="320" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-23" value="Qdrant create_collection if missing&#xa;upsert(points)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-19">
+          <mxGeometry x="20" y="330" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-24" value="Media volume&#xa;/data/media&#xa;API serves /media-files/&lt;file&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;dashed=1;" vertex="1" parent="b-c7LzUmXXwkKilcHmsQ-19">
+          <mxGeometry x="20" y="660" width="320" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-25" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-2" target="b-c7LzUmXXwkKilcHmsQ-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-26" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-8" target="b-c7LzUmXXwkKilcHmsQ-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-27" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-15" target="b-c7LzUmXXwkKilcHmsQ-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-28" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-8" target="b-c7LzUmXXwkKilcHmsQ-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-29" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-4" target="b-c7LzUmXXwkKilcHmsQ-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-30" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-10" target="b-c7LzUmXXwkKilcHmsQ-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-31" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-16" target="b-c7LzUmXXwkKilcHmsQ-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-32" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-5" target="b-c7LzUmXXwkKilcHmsQ-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-33" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-11" target="b-c7LzUmXXwkKilcHmsQ-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-34" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-17" target="b-c7LzUmXXwkKilcHmsQ-12">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="810" y="640" />
+              <mxPoint x="450" y="640" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-35" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-6" target="b-c7LzUmXXwkKilcHmsQ-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-36" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-13" target="b-c7LzUmXXwkKilcHmsQ-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-37" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-18" target="b-c7LzUmXXwkKilcHmsQ-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-38" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-15" target="b-c7LzUmXXwkKilcHmsQ-20">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="750" y="450" as="sourcePoint" />
+            <mxPoint x="990" y="190" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1010" y="240" />
+              <mxPoint x="1010" y="190" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-39" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-15" target="b-c7LzUmXXwkKilcHmsQ-21">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="990" y="210" as="sourcePoint" />
+            <mxPoint x="1060" y="200" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1010" y="240" />
+              <mxPoint x="1010" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b-c7LzUmXXwkKilcHmsQ-40" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="b-c7LzUmXXwkKilcHmsQ-15" target="b-c7LzUmXXwkKilcHmsQ-22">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1030" y="250" as="sourcePoint" />
+            <mxPoint x="1100" y="240" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1010" y="240" />
+              <mxPoint x="1010" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
