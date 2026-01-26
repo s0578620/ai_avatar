@@ -2,11 +2,10 @@ import os
 import json
 import logging
 from typing import Optional, Dict, Any, List
+
 import requests
 from celery import Celery
 from redis import Redis
-from services.shared.rag_core import RAG
-
 from pathlib import Path
 from uuid import uuid4
 
@@ -14,14 +13,23 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
+from services.shared.rag_core import RAG
+
 BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
 MAX_HISTORY = int(os.getenv("MAX_HISTORY_MESSAGES", "6"))
 
 USER_API_BASE = os.getenv("USER_API_BASE", "http://api:8000")
 
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "data/media"))
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/data/media"))
+try:
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    # Fallback für CI / read-only Filesysteme
+    from tempfile import gettempdir
+
+    MEDIA_ROOT = Path(gettempdir()) / "media"
+    MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 celery = Celery("worker", broker=BROKER_URL, backend=RESULT_BACKEND)
 rag = RAG()
@@ -29,6 +37,26 @@ rag = RAG()
 redis = Redis.from_url(BROKER_URL.replace("/0", "/1"))
 
 logger = logging.getLogger(__name__)
+
+def _strip_code_fences(raw: str) -> str:
+    """
+    Entfernt ``` und ```json Code-Fences aus LLM-Antworten,
+    damit json.loads() damit klarkommt.
+    """
+    raw = raw.strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+
+        # erste Zeile: ``` oder ```json etc -> weg
+        if lines and lines[0].lstrip().startswith("```"):
+            lines = lines[1:]
+
+        # letzte Zeile: ``` -> weg
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+
+        raw = "\n".join(lines).strip()
+    return raw
 
 def _hkey(sid: str) -> str:
     return f"chat:{sid}"
@@ -44,6 +72,7 @@ def _hist(sid: str):
 def _append(sid: str, role: str, content: str):
     redis.rpush(_hkey(sid), json.dumps({"role": role, "content": content}))
     redis.ltrim(_hkey(sid), -MAX_HISTORY * 2, -1)
+
 
 def _fetch_user_profile(student_id: Optional[int]) -> Optional[dict]:
     """
@@ -64,6 +93,7 @@ def _fetch_user_profile(student_id: Optional[int]) -> Optional[dict]:
     except Exception as e:
         logger.warning(f"Could not fetch user profile for {student_id}: {e}")
         return None
+
 
 def _build_profile_prefix(user_profile: Optional[dict]) -> str:
     """
@@ -88,6 +118,11 @@ def _build_profile_prefix(user_profile: Optional[dict]) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# RAG-Ingest & Chat
+# ---------------------------------------------------------------------------
 
 @celery.task(name="tasks.ingest_text", bind=True)
 def ingest_text(
@@ -128,21 +163,17 @@ def chat_with_rag(
     UND optionalem User-Profil und generiert eine Antwort mit Gemini.
     """
     try:
-        # 1. RAG-Retrieval
         hits = rag.search(collection, message)
         contexts = [h[1].get("text", "") for h in hits]
 
-        # 2. Chat-History
         history_text = "\n".join(
             f"{h['role'].upper()}: {h['content']}"
             for h in _hist(session_id)[-MAX_HISTORY:]
         )
 
-        # 3. User-Profil holen und als System-Kontext einbauen
         user_profile = _fetch_user_profile(student_id)
         profile_prefix = _build_profile_prefix(user_profile)
 
-        # 4. Alles kombinieren
         parts = []
         if profile_prefix:
             parts.append(profile_prefix)
@@ -157,11 +188,9 @@ def chat_with_rag(
         else:
             prompt_input = user_line
 
-        # 5. Prompt für LLM bauen
         prompt = rag.build_prompt(prompt_input, contexts)
         answer = rag.generate(prompt)
 
-        # 6. History aktualisieren
         _append(session_id, "user", message)
         _append(session_id, "assistant", answer)
 
@@ -175,19 +204,21 @@ def chat_with_rag(
             f"Chat failed for session '{session_id}' in collection '{collection}': {e}"
         ) from e
 
+
+# ---------------------------------------------------------------------------
+# Lesson Planner
+# ---------------------------------------------------------------------------
+
 @celery.task(name="tasks.generate_lesson_plan")
 def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generiert einen Unterrichtsplan mit Gemini und verknüpft passende Media-IDs
     über die Media-API (/api/media).
     """
-    rag = RAG()
-
     topic = payload["topic"]
     duration = payload["duration_minutes"]
     grade_level = payload.get("grade_level") or "unknown"
 
-    # ---------- 1) Prompt für Gemini ----------
     prompt = f"""
     You are a helpful lesson planning assistant for German teachers.
 
@@ -222,16 +253,16 @@ def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
     - Use 3–6 steps.
     - "phase" must be one of: "Einstieg", "Erarbeitung", "Sicherung", "Abschluss".
     - "media_tags" is a list of simple lowercase keywords.
-        """.strip()
+    """.strip()
 
     raw = rag.generate(prompt)
+    raw = _strip_code_fences(raw)
     logger.info("Lesson planner raw output: %s", raw)
 
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
         logger.warning("Could not parse lesson planner JSON: %s; raw=%r", e, raw)
-        # Fallback: Minimaler Plan
         data = {
             "steps": [
                 {
@@ -247,7 +278,6 @@ def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
         }
 
     steps: List[Dict[str, Any]] = data.get("steps", [])
-
     api_base = os.getenv("USER_API_BASE", "http://api:8000")
 
     def fetch_media_ids_for_tags(tags: List[str]) -> List[int]:
@@ -255,7 +285,6 @@ def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         for tag in tags:
             resp = None
-
             try:
                 resp = requests.get(
                     f"{api_base}/api/media",
@@ -321,6 +350,139 @@ def generate_lesson_plan(payload: Dict[str, Any]) -> Dict[str, Any]:
         "steps": enriched_steps,
     }
 
+
+# ---------------------------------------------------------------------------
+# Worksheet Content Generator (LLM-only, kein PDF)
+# ---------------------------------------------------------------------------
+
+@celery.task(name="tasks.generate_worksheet_items")
+def generate_worksheet_items(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Erzeugt Arbeitsblatt-Aufgaben mit Gemini.
+
+    Input:
+    {
+      "topic": "...",
+      "learning_goal": "...",
+      "grade_level": "5",
+      "student_id": 1,           # optional
+      "interests": ["Tiere"],    # optional, überschreibt Profil-Interessen
+      "num_tasks": 4             # optional (1–10)
+    }
+    """
+    topic: str = payload["topic"]
+    learning_goal: str = payload["learning_goal"]
+    grade_level: str = payload.get("grade_level") or "unknown"
+    student_id: int | None = payload.get("student_id")
+    num_tasks_raw = payload.get("num_tasks") or 4
+
+    try:
+        num_tasks = int(num_tasks_raw)
+    except (TypeError, ValueError):
+        num_tasks = 4
+    num_tasks = max(1, min(num_tasks, 10))
+
+    # Interessen sammeln: explizit > Profil > Fallback
+    explicit_interests: List[str] = payload.get("interests") or []
+    profile_interests: List[str] = []
+
+    if student_id is not None and not explicit_interests:
+        profile = _fetch_user_profile(student_id)
+        if profile:
+            profile_interests = profile.get("interests") or []
+
+    merged_interests: List[str] = explicit_interests or profile_interests
+    interests_text = (
+        ", ".join(merged_interests)
+        if merged_interests
+        else "keine besonderen Interessen angegeben"
+    )
+
+    prompt = f"""
+Du bist eine hilfsbereite KI für Kinder im Alter von ca. 8–13 Jahren.
+
+Erstelle {num_tasks} Übungen für ein Arbeitsblatt.
+
+Rahmendaten:
+- Lernziel: {learning_goal}
+- Thema: {topic}
+- Klassenstufe: {grade_level}
+- Interessen des Kindes: {interests_text}
+
+Gib deine Antwort AUSSCHLIESSLICH als gültiges JSON zurück,
+ohne Erklärtext, ohne Markdown, ohne Backticks, ohne Kommentare.
+
+Verwende EXAKT dieses Schema:
+
+{{
+  "title": "Arbeitsblatt: ...",
+  "tasks": [
+    {{
+      "question": "Aufgabentext in deutscher Sprache",
+      "solution": "Kurzlösung oder Beispielantwort"
+    }}
+  ]
+}}
+
+Regeln:
+- Schreibe alles auf Deutsch.
+- Formuliere kindgerecht und motivierend, aber fachlich korrekt.
+- Die Aufgaben müssen zum angegebenen Lernziel passen.
+- Nutze die Interessen nur, um Beispiele oder Geschichten einzubetten.
+- Pro Lösung maximal 2–3 Sätze oder Stichpunkte.
+""".strip()
+
+    raw = rag.generate(prompt)
+    logger.info("Worksheet generator raw output: %s", raw)
+    raw = _strip_code_fences(raw)
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        logger.warning("Could not parse worksheet JSON: %s; raw=%r", e, raw)
+        data = {
+            "title": f"Arbeitsblatt: {topic}",
+            "tasks": [
+                {
+                    "question": f"Schreibe auf, was du bereits über das Thema '{topic}' weißt.",
+                    "solution": "Die Lehrkraft ergänzt hier eine Beispielantwort.",
+                }
+            ],
+        }
+
+    raw_tasks = data.get("tasks") or []
+    cleaned_tasks: List[Dict[str, str]] = []
+
+    for t in raw_tasks:
+        q = (t.get("question") or "").strip()
+        s = (t.get("solution") or "").strip()
+        if not q:
+            continue
+        cleaned_tasks.append({"question": q, "solution": s})
+
+    if not cleaned_tasks:
+        cleaned_tasks.append(
+            {
+                "question": f"Notiere drei Dinge, die du über '{topic}' gelernt hast.",
+                "solution": "",
+            }
+        )
+
+    result: Dict[str, Any] = {
+        "title": (data.get("title") or f"Arbeitsblatt: {topic}").strip(),
+        "topic": topic,
+        "learning_goal": learning_goal,
+        "grade_level": grade_level,
+        "student_id": student_id,
+        "interests": merged_interests,
+        "tasks": cleaned_tasks,
+    }
+    return result
+
+
+# ---------------------------------------------------------------------------
+# PDF-Generator
+# ---------------------------------------------------------------------------
+
 @celery.task(name="tasks.generate_pdf_from_json")
 def generate_pdf_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -344,12 +506,10 @@ def generate_pdf_from_json(payload: Dict[str, Any]) -> Dict[str, Any]:
     styles = getSampleStyleSheet()
     doc = SimpleDocTemplate(str(filepath), pagesize=A4)
 
-    story = []
-    # Header
+    story: List[Any] = []
     story.append(Paragraph(title, styles["Heading1"]))
     story.append(Spacer(1, 18))
 
-    # Aufgaben
     for idx, task in enumerate(tasks, start=1):
         question = task.get("question") or task.get("text") or ""
         if not question:
