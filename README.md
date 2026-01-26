@@ -1,14 +1,40 @@
 # AI-Avatar
 
 A Retrieval-Augmented Generation (RAG) based AI Avatar platform designed for educational use.
-Teachers can manage classes, students, media, and knowledge sources, while students interact with a context-aware AI avatar.
-Gamification and personalization (interests, levels, badges) are built in.
+
+- **Teachers** manage classes, students, media, and knowledge sources.
+- **Students** interact with a context-aware AI avatar.
+- **Gamification & personalization** (interests, levels, badges) are built in.
 
 **Tech Stack:** FastAPI · Celery · Redis · Qdrant · PostgreSQL · n8n · Gemini API
 
 ---
 
-## Architecture Overview
+## Table of contents
+
+- [Architecture](#architecture)
+- [Requirements](#requirements)
+- [Environment configuration](#environment-configuration)
+- [Import n8n workflows](#import-n8n-workflows)
+- [Health checks](#health-checks)
+- [Async task model](#async-task-model)
+- [API examples](#api-examples)
+  - [RAG: ingest](#rag-ingest)
+  - [RAG: chat](#rag-chat)
+  - [Teachers & auth](#teachers--auth)
+  - [Classes & students](#classes--students)
+  - [Student profile & interests](#student-profile--interests)
+  - [Media](#media)
+  - [Gamification](#gamification)
+  - [Lesson planner](#lesson-planner)
+- [Troubleshooting](#troubleshooting)
+- [Security notes](#security-notes)
+- [Project structure](#project-structure)
+- [Tests (optional)](#tests-optional)
+
+---
+
+## Architecture
 
 ```
 Client (Browser / App)
@@ -24,8 +50,6 @@ n8n Workflows     Media Storage
      Gemini API
 ```
 
----
-
 ## Requirements
 
 - Docker Desktop with WSL2 backend (Windows) **or**
@@ -33,9 +57,18 @@ n8n Workflows     Media Storage
 
 ---
 
-## Environment Configuration
+**UIs**
+- FastAPI Docs: http://localhost:8000/docs
+- n8n: http://localhost:5678
+- Qdrant Dashboard: http://localhost:6333/dashboard
 
-Create a `.env` file in the project root (if not present):
+---
+
+## Environment configuration
+
+Create a `.env` file in the project root
+
+### `.env.example`
 
 ```env
 # =========================
@@ -84,19 +117,19 @@ DB_POSTGRESDB_PASSWORD=n8n
 DB_POSTGRESDB_DATABASE=n8n
 
 # SQLAlchemy URL for user database
+# IMPORTANT: make sure the database exists, see Troubleshooting.
 USER_DB_URL=postgresql+psycopg2://n8n:n8n@db:5432/avatar_userdb
+
+# Optional: Base URL used by worker tasks
+USER_API_BASE=http://api:8000
 
 # =========================
 # Media Storage
 # =========================
 MEDIA_ROOT=/data/media
-
-# Optional: Base URL used by worker tasks
-# USER_API_BASE=http://api:8000
 ```
 
 ---
-
 ## Start the Project
 
 ```bash
@@ -105,15 +138,7 @@ docker compose up -d --build
 
 ⏱ First startup may take **1–3 minutes**.
 
-### Available UIs
-
-- FastAPI Docs: http://localhost:8000/docs
-- n8n: http://localhost:5678
-- Qdrant Dashboard: http://localhost:6333/dashboard
-
----
-
-## Import n8n Workflows
+## Import n8n workflows
 
 1. Open http://localhost:5678
 2. Log in to n8n
@@ -123,7 +148,7 @@ docker compose up -d --build
 
 ---
 
-## Health Checks
+## Health checks
 
 ```bash
 # Basic API health
@@ -138,30 +163,38 @@ curl http://localhost:8000/health/gemini
 
 ---
 
-## Asynchronous API Note
+## Async task model
 
 Most endpoints run **asynchronously** using Celery.
+They return a `task_id`.
 
-They return a `task_id`.  
-Use `/tasks/{task_id}` to retrieve the final result.
+```bash
+curl http://localhost:8000/tasks/<task_id>
+```
 
 ---
 
-## RAG API
+## API examples
 
-### Ingest Text
+### RAG: ingest
+
+#### Ingest text
 
 ```bash
-curl -X POST "http://localhost:8000/ingest"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{
     "text": "Paris is the capital of France.",
     "collection": "avatar_docs"
   }'
 ```
 
-With metadata:
+#### Ingest with metadata
 
 ```bash
-curl -X POST "http://localhost:8000/ingest"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{
     "text": "Foxes live in forests and are very clever animals.",
     "collection": "avatar_docs",
     "doc_id": "fox_facts_01",
@@ -173,18 +206,14 @@ curl -X POST "http://localhost:8000/ingest"   -H "Content-Type: application/json
   }'
 ```
 
-Check task status:
-
-```bash
-curl http://localhost:8000/tasks/<task_id>
-```
-
 ---
 
-### RAG Chat
+### RAG: chat
 
 ```bash
-curl -X POST "http://localhost:8000/chat"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/chat" \
+  -H "Content-Type: application/json" \
+  -d '{
     "message": "Tell me something interesting about foxes.",
     "session_id": "demo-session-1",
     "collection": "avatar_docs",
@@ -194,28 +223,33 @@ curl -X POST "http://localhost:8000/chat"   -H "Content-Type: application/json" 
 
 ---
 
-## User & Class Management API
+### Teachers & auth
 
-### Register Teacher
+#### Register teacher
 
 ```bash
-curl -X POST "http://localhost:8000/api/teachers/register"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/api/teachers/register" \
+  -H "Content-Type: application/json" \
+  -d '{
     "name": "Demo Teacher",
     "email": "demo@example.com",
     "password": "test123"
   }'
 ```
 
-### Teacher Login
+#### Teacher login
 
 ```bash
-curl -X POST "http://localhost:8000/api/auth/login"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
     "email": "demo@example.com",
     "password": "test123"
   }'
 ```
 
-### Request Password Reset (Teacher)
+#### Request password reset (teacher)
+
 ```bash
 curl -X POST "http://localhost:8000/api/auth/request-password-reset" \
   -H "Content-Type: application/json" \
@@ -223,7 +257,8 @@ curl -X POST "http://localhost:8000/api/auth/request-password-reset" \
     "email": "demo@example.com"
   }'
 ```
-Example Response(ONLY IN DEV-MODE!):
+
+**Example response (DEV only):**
 ```json
 {
   "status": "ok",
@@ -231,7 +266,8 @@ Example Response(ONLY IN DEV-MODE!):
 }
 ```
 
-### Set New Password (Teacher)
+#### Set new password (teacher)
+
 ```bash
 curl -X POST "http://localhost:8000/api/auth/reset-password" \
   -H "Content-Type: application/json" \
@@ -241,7 +277,7 @@ curl -X POST "http://localhost:8000/api/auth/reset-password" \
   }'
 ```
 
-### Student Login
+#### Student login
 
 ```bash
 curl -X POST "http://localhost:8000/api/auth/student-login" \
@@ -251,36 +287,25 @@ curl -X POST "http://localhost:8000/api/auth/student-login" \
     "password": "geheim123"
   }'
 ```
-Example Response (Success):
+
+Example response:
 ```json
 {
   "student_id": 1,
   "class_id": 1
 }
 ```
-Example Response (Invalid Credentials):
-```json
-{
-  "detail": "Invalid credentials"
-}
-```
-### Teacher Resert Password
-
-```bash
-curl -X POST "http://localhost:8000/api/auth/request-password-reset" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "demo@example.com"
-  }'
-```
-
 
 ---
 
-### Create Class
+### Classes & students
+
+#### Create class
 
 ```bash
-curl -X POST "http://localhost:8000/api/classes"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/api/classes" \
+  -H "Content-Type: application/json" \
+  -d '{
     "name": "Class 5A",
     "teacher_id": 1,
     "grade_level": "5",
@@ -288,18 +313,18 @@ curl -X POST "http://localhost:8000/api/classes"   -H "Content-Type: application
   }'
 ```
 
-### List Classes
+#### List classes
 
 ```bash
 curl http://localhost:8000/api/classes
 ```
 
----
-
-### Add Student
+#### Add student
 
 ```bash
-curl -X POST "http://localhost:8000/api/classes/1/students"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/api/classes/1/students" \
+  -H "Content-Type: application/json" \
+  -d '{
     "name": "Max Mustermann",
     "class_id": 1,
     "username": "max1",
@@ -307,7 +332,7 @@ curl -X POST "http://localhost:8000/api/classes/1/students"   -H "Content-Type: 
   }'
 ```
 
-### Export Students as CSV
+#### Export students as CSV
 
 ```bash
 curl http://localhost:8000/api/classes/1/students/export -o students.csv
@@ -315,32 +340,33 @@ curl http://localhost:8000/api/classes/1/students/export -o students.csv
 
 ---
 
-## Student Profile & Interests
+### Student profile & interests
 
 ```bash
-curl -X POST "http://localhost:8000/api/user/interests"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/api/user/interests" \
+  -H "Content-Type: application/json" \
+  -d '{
     "student_id": 1,
     "interest_text": "Likes animals and Minecraft"
   }'
 ```
 
 ```bash
-curl http://localhost:8000/api/user/profile?student_id=1
+curl "http://localhost:8000/api/user/profile?student_id=1"
 ```
 
 ---
 
-## Media API
+### Media
 
 Teachers can upload files (images, PDFs) and link them to classes and tags.
 
-### Supported Types
-
+**Supported types**
 - Images: jpg, png, webp
 - Documents: pdf
 - Max file size: 10 MB
 
-### Upload Media
+#### Upload media
 
 ```bash
 curl -X POST "http://localhost:8000/api/media/" \
@@ -351,7 +377,7 @@ curl -X POST "http://localhost:8000/api/media/" \
   -F "file=@files_test/fox.webp"
 ```
 
-### List Media
+#### List media
 
 ```bash
 curl "http://localhost:8000/api/media/"
@@ -361,23 +387,26 @@ curl "http://localhost:8000/api/media/?tag=fox"
 curl "http://localhost:8000/api/media/?tag=fox&type=image"
 ```
 
-### Delete Media
+#### Delete media
 
 ```bash
-curl -X DELETE http://localhost:8000/api/media/1
+curl -X DELETE "http://localhost:8000/api/media/1"
 ```
 
----
-### Access Media File
+#### Access media file
 
-```bash
+```text
 http://localhost:8000/media-files/<filename>
 ```
 
-## Gamification API
+---
+
+### Gamification
 
 ```bash
-curl -X POST "http://localhost:8000/api/gamification/event"   -H "Content-Type: application/json"   -d '{
+curl -X POST "http://localhost:8000/api/gamification/event" \
+  -H "Content-Type: application/json" \
+  -d '{
     "student_id": 1,
     "event_type": "ask_question"
   }'
@@ -385,11 +414,9 @@ curl -X POST "http://localhost:8000/api/gamification/event"   -H "Content-Type: 
 
 ---
 
-## Lesson Plan API
+### Lesson planner
 
-### Request Lesson Plan
-
-```bash
+#### Request lesson plan
 
 ```bash
 curl -X POST "http://localhost:8000/lesson-planner" \
@@ -403,46 +430,32 @@ curl -X POST "http://localhost:8000/lesson-planner" \
 }
 EOF
 ```
-### Response
 
+Response:
 ```json
 {
   "task_id": "..."
 }
 ```
 
-### Check Result
-
+Check result:
 ```bash
 curl http://localhost:8000/tasks/<task_id>
 ```
-Example Response:
-```json
-{
-  "topic": "Füchse im Wald",
-  "duration_minutes": 45,
-  "grade_level": "5",
-  "class_id": 1,
-  "steps": [
-    {
-      "id": "intro",
-      "phase": "Einstieg",
-      "title": "Einstieg ins Thema Füchse",
-      "description": "2–3 erklärende Sätze auf Deutsch ...",
-      "start_minute": 0,
-      "end_minute": 10,
-      "media_tags": ["tiere", "fuchs"],
-      "media_ids": [1, 3]
-    }
-  ]
-}
-
-
-```
-
 
 ---
-## Running Tests Locally (Optional)
+
+## Project structure
+
+- `services/api/` – FastAPI app (HTTP endpoints, DB models, routes)
+- `services/worker/` – Celery worker (ingest/chat/lesson-plan/worksheet/pdf tasks)
+- `services/shared/` – shared RAG logic (`rag_core.py`)
+- `n8n_workflows/` – n8n workflows exports
+- `data/media/` – persistent media volume (mounted into API + worker)
+
+---
+
+## Tests (optional)
 
 ```bash
 python -m venv .venv
@@ -459,5 +472,3 @@ pytest -m "not integration"
 docker compose up -d
 pytest -m integration
 ```
-
----
