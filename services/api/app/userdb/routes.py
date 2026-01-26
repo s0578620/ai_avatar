@@ -291,3 +291,33 @@ def get_user_profile(
         class_name=cls.name if cls else "",
         interests=interests,
     )
+
+@router.delete("/user/student/{student_id}")
+def delete_student(
+    student_id: int,
+    teacher_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Löscht einen Schüler wenn der aufrufende Lehrer
+    auch der Klassenlehrer dieses Schülers ist.
+    """
+    student = (
+        db.query(models.Student)
+        .filter(models.Student.id == student_id)
+        .first()
+    )
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    cls = student.class_
+    if not cls:
+        raise HTTPException(status_code=400, detail="Student has no class assigned")
+
+    if cls.teacher_id != teacher_id:
+        raise HTTPException(status_code=403, detail="Not allowed to delete this student")
+
+    db.delete(student)
+    db.commit()
+
+    return {"status": "deleted", "id": student_id}
