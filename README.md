@@ -1,3 +1,4 @@
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3110/)   
 # AI-Avatar
 
 A Retrieval-Augmented Generation (RAG) based AI Avatar platform designed for educational use.
