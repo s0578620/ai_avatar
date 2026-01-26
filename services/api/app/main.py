@@ -12,6 +12,7 @@ from .userdb.database import init_db
 from .userdb.routes import router as userdb_router
 from .media import router as media_router, MEDIA_ROOT
 from .gamification import router as gamification_router
+from fastapi.middleware.cors import CORSMiddleware
 
 try:
     from pypdf import PdfReader
@@ -29,6 +30,19 @@ celery = Celery(__name__, broker=BROKER_URL, backend=RESULT_BACKEND)
 rag = RAG()
 
 app = FastAPI(title="Avatar RAG API", version="0.4.0")
+
+origins = [
+    "http://localhost:5173",
+    "http://localhost:5173/",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --------------------
