@@ -98,6 +98,15 @@ class WorksheetIn(BaseModel):
     title: str
     tasks: List[WorksheetTask]
 
+class WorksheetContentRequest(BaseModel):
+    topic: str
+    learning_goal: str
+    grade_level: Optional[str] = None
+    student_id: Optional[int] = None
+    interests: Optional[List[str]] = None
+    num_tasks: int = Field(default=4, ge=1, le=10)
+
+
 # --------------------
 # Health-Endpoints
 # --------------------
@@ -241,6 +250,18 @@ def create_worksheet_pdf(payload: WorksheetIn):
     task = celery.send_task(
         "tasks.generate_pdf_from_json",
         args=[payload.model_dump()],
+    )
+    return {"task_id": task.id}
+
+@app.post("/worksheet/content")
+async def worksheet_content(req: WorksheetContentRequest):
+    """
+    Erzeugt nur die Aufgaben-JSON für ein Arbeitsblatt (noch kein PDF).
+    Antwort: { "task_id": "..." } – Ergebnis dann über /tasks/{id} holen.
+    """
+    task = celery.send_task(
+        "tasks.generate_worksheet_items",
+        args=[req.model_dump()],
     )
     return {"task_id": task.id}
 
