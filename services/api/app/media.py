@@ -2,7 +2,10 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
+from PIL import Image
+import logging
 from typing import Optional, List
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
@@ -12,20 +15,34 @@ from sqlalchemy.orm import Session
 
 from .userdb.database import Base, get_db
 
-MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "data/media"))
-MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/data/media"))
 
 try:
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 except PermissionError:
-    # Fallback für CI / read-only Filesysteme:
     from tempfile import gettempdir
 
     MEDIA_ROOT = Path(gettempdir()) / "media"
     MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
-
 router = APIRouter(prefix="/media", tags=["media"])
 
+logger = logging.getLogger(__name__)
+
+THUMB_MAX_SIZE = (400, 400)
+
+def create_image_thumbnail(src_path: Path) -> Path | None:
+    try:
+        thumb_name = f"{src_path.stem}_thumb.webp"
+        thumb_path = src_path.with_name(thumb_name)
+
+        with Image.open(src_path) as img:
+            img.thumbnail(THUMB_MAX_SIZE)
+            img.save(thumb_path, format="WEBP")
+
+        return thumb_path
+    except Exception as e:
+        logger.warning("Could not create thumbnail for %s: %s", src_path, e)
+        return None
 
 # -----------------------
 # SQLAlchemy Modell
@@ -83,21 +100,24 @@ def _parse_tags(raw: Optional[str]) -> Optional[List[str]]:
     if not raw:
         return None
 
-    # Versuche JSON-Array
+    # 1) Versuche JSON-Array
     if raw.startswith("["):
-        import json
-
-        value = None
         try:
             value = json.loads(raw)
         except json.JSONDecodeError:
             value = None
 
         if isinstance(value, list):
-            return [str(v).strip() for v in value if str(v).strip()]
+            cleaned = [str(v).strip() for v in value if str(v).strip()]
+            return cleaned or None
 
+    # 2) Fallback: Komma-getrennte Liste
+    parts = [p.strip() for p in raw.split(",")]
+    cleaned = [p.strip(' "\'[]') for p in parts]  # Quotes & [] weg
+    cleaned = [p for p in cleaned if p]
 
-# -----------------------
+    return cleaned or None
+# -----------------------]
 # Endpoints
 # -----------------------
 @router.post("/", response_model=MediaOut)
@@ -126,14 +146,21 @@ async def upload_media(
     # 2) Tags parsen
     tag_list = _parse_tags(tags)
 
-    # 3) DB-Objekt anlegen (id kommt auto-increment aus Postgres)
+    # 3) Thumbnail erzeugen (images)
+    thumbnail_path: Optional[str] = None
+    if type == "image":
+        thumb = create_image_thumbnail(dest)
+        if thumb is not None:
+            thumbnail_path = str(thumb)
+
+    # 4) DB-Objekt anlegen (id kommt auto-increment aus Postgres)
     media = Media(
         teacher_id=teacher_id,
         class_id=class_id,
         type=type,
         original_filename=file.filename,
         path=str(dest),
-        thumbnail_path=None,  # TODO Thumbnail-Generierung
+        thumbnail_path=thumbnail_path,
         tags=tag_list,
     )
 
