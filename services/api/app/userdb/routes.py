@@ -136,6 +136,7 @@ def student_login(
     return {
         "student_id": student.id,
         "class_id": student.class_id,
+        "role": "student",
     }
 @router.post("/auth/login")
 def login_teacher(
@@ -153,7 +154,10 @@ def login_teacher(
             detail="Invalid credentials",
         )
 
-    return {"teacher_id": teacher.id}
+    return {
+        "teacher_id": teacher.id,
+        "role": "teacher",
+    }
 
 
 # ---------- Classes ----------
@@ -182,8 +186,14 @@ def create_class(
 
 
 @router.get("/classes", response_model=List[schemas.ClassOut])
-def list_classes(db: Session = Depends(get_db)):
-    return db.query(models.Class).all()
+def list_classes(
+        teacher_id: int | None = None,
+        db: Session = Depends(get_db),
+):
+        query = db.query(models.Class)
+        if teacher_id is not None:
+            query = query.filter(models.Class.teacher_id == teacher_id)
+        return query.all()
 
 
 @router.post("/classes/{class_id}/students", response_model=schemas.StudentOut)
@@ -242,7 +252,50 @@ def export_students(
         },
     )
 
+@router.get(
+    "/classes/{class_id}/students",
+    response_model=List[schemas.StudentOut],
+)
+def list_students_for_class(
+    class_id: int,
+    teacher_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Gibt die Schüler einer Klasse zurück (nur für den passenden Lehrer).
 
+    Mini-RBAC:
+    - teacher_id muss zu class.teacher_id passen.
+    """
+    cls = (
+        db.query(models.Class)
+        .filter(models.Class.id == class_id)
+        .first()
+    )
+    if not cls:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    if cls.teacher_id != teacher_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Not allowed to view students of this class",
+        )
+
+    students = (
+        db.query(models.Student)
+        .filter(models.Student.class_id == class_id)
+        .all()
+    )
+    return students
+"""
+Request:
+    GET /classes/<class_id>/students/<student_id>
+Response:
+    [
+      { "id": 1, "name": "Max", "class_id": 1, "username": "max1" },
+      { "id": 2, "name": "Lena", "class_id": 1, "username": "lena1" }
+    ]
+"""
 # ---------- Interests & Profile ----------
 
 @router.post("/user/interests", response_model=schemas.StudentInterestOut)

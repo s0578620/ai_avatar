@@ -27,8 +27,6 @@ A Retrieval-Augmented Generation (RAG) based AI Avatar platform designed for edu
   - [Media](#media)
   - [Gamification](#gamification)
   - [Lesson planner](#lesson-planner)
-- [Troubleshooting](#troubleshooting)
-- [Security notes](#security-notes)
 - [Project structure](#project-structure)
 - [Tests (optional)](#tests-optional)
 
@@ -176,6 +174,40 @@ curl http://localhost:8000/tasks/<task_id>
 
 ## API examples
 
+### Worksheet generator
+
+#### Only Tasks (JSON, no PDF)
+
+```bash
+curl -X POST "http://localhost:8000/worksheet/content" \
+  -H "Content-Type: application/json" \
+  --data-binary @- << 'EOF'
+{
+  "topic": "Füchse im Wald",
+  "learning_goal": "Leseverständnis zu Sachtexten üben",
+  "grade_level": "5",
+  "interests": ["Tiere"],
+  "num_tasks": 4
+}
+EOF
+```
+
+**Example response (/tasks/<task_id>):**
+```json
+{
+  "title": "Arbeitsblatt: ...",
+  "topic": "...",
+  "learning_goal": "...",
+  "grade_level": "5",
+  "student_id": null,
+  "interests": ["Tiere"],
+  "tasks": [
+    {"question": "...", "solution": "..."}
+  ]
+}
+```
+
+**Generate PDF from Worksheet JSON**
 ### RAG: ingest
 
 #### Ingest text
@@ -187,6 +219,12 @@ curl -X POST "http://localhost:8000/ingest" \
     "text": "Paris is the capital of France.",
     "collection": "avatar_docs"
   }'
+```
+**Example response (/tasks/<task_id>):**
+```json
+{
+  "pdf_url": "/media-files/worksheet_....pdf"
+}
 ```
 
 #### Ingest with metadata
@@ -222,6 +260,17 @@ curl -X POST "http://localhost:8000/chat" \
 ```
 
 ---
+### Mini-Auth & RBAC (Demo)
+
+- There are two roles:
+  - **Teacher** – registers via email/password and manages classes, students, media.
+  - **Student** – receives login details from the teacher and only uses the avatar.
+- Passwords are hashed with PBKDF2-SHA256 (`passlib`).
+- There are **no** JWTs/sessions – the frontend remembers `teacher_id` or `student_id`.
+- RBAC current:
+- Only teachers are allowed to create classes and students.
+- A student can only be deleted if the requesting `teacher_id` is the class teacher of that class (`/api/user/student/{student_id}`).
+- This model is deliberately kept simple and is only intended for local demo/school projects.
 
 ### Teachers & auth
 
