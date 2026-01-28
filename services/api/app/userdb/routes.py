@@ -370,6 +370,13 @@ def delete_student(
     if cls.teacher_id != teacher_id:
         raise HTTPException(status_code=403, detail="Not allowed to delete this student")
 
+     # Löscht alle Badges zuerst
+    db.query(models.StudentBadge).filter(
+    models.StudentBadge.student_id == student_id).delete(synchronize_session=False)
+    #Löscht Studentinterest
+    db.query(models.StudentInterest).filter(
+        models.StudentInterest.student_id == student_id).delete(synchronize_session=False)
+    # Löscht student
     db.delete(student)
     db.commit()
 
