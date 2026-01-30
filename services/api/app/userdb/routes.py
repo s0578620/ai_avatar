@@ -289,7 +289,7 @@ def list_students_for_class(
     return students
 """
 Request:
-    GET /classes/<class_id>/students/<student_id>
+    GET /classes/<class_id>/students?teacher_id=<teacher_id>
 Response:
     [
       { "id": 1, "name": "Max", "class_id": 1, "username": "max1" },
@@ -370,12 +370,17 @@ def delete_student(
     if cls.teacher_id != teacher_id:
         raise HTTPException(status_code=403, detail="Not allowed to delete this student")
 
-     # Löscht alle Badges zuerst
+    # Löscht alle Badges zuerst
     db.query(models.StudentBadge).filter(
     models.StudentBadge.student_id == student_id).delete(synchronize_session=False)
-    #Löscht Studentinterest
+    # Löscht Studentinterest
     db.query(models.StudentInterest).filter(
         models.StudentInterest.student_id == student_id).delete(synchronize_session=False)
+    # Löscht Gamifications
+    db.query(models.GamificationState).filter(
+        models.GamificationState.student_id == student_id
+    ).delete(synchronize_session=False)
+
     # Löscht student
     db.delete(student)
     db.commit()
