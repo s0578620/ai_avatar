@@ -1,5 +1,10 @@
 FROM python:3.11-slim
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get upgrade -y openssl libssl3 \
+    && rm -rf /var/lib/apt/lists/* \
+
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
