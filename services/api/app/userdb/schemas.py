@@ -16,7 +16,7 @@ class TeacherCreate(TeacherBase):
 
 class TeacherOut(TeacherBase):
     id: int
-
+    role: str = "teacher"
     class Config:
         from_attributes = True
 

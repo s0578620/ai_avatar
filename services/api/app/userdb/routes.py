@@ -94,8 +94,19 @@ def reset_password(
 @router.post("/teachers/register", response_model=schemas.TeacherOut)
 def register_teacher(
         payload: schemas.TeacherCreate,
+        creator_id: int,
         db: Session = Depends(get_db),
 ):
+    creator = (
+        db.query(models.Teacher)
+        .filter(models.Teacher.id == creator_id)
+        .first()
+    )
+    if not creator or creator.role != "dev":
+        raise HTTPException(
+            status_code=403,
+            detail="Only dev/admin may register teachers",
+        )
     existing = (
         db.query(models.Teacher)
         .filter(models.Teacher.email == payload.email)
@@ -110,6 +121,7 @@ def register_teacher(
         name=payload.name,
         email=payload.email,
         password_hash=hash_password(payload.password),
+        role="teacher",
     )
     db.add(teacher)
     db.commit()
@@ -156,7 +168,7 @@ def login_teacher(
 
     return {
         "teacher_id": teacher.id,
-        "role": "teacher",
+        "role": teacher.role,
     }
 
 
