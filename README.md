@@ -20,16 +20,16 @@ A Retrieval-Augmented Generation (RAG) based AI Avatar platform designed for edu
 - [Health checks](#health-checks)
 - [Async task model](#async-task-model)
 - [API examples](#api-examples)
+  - [Worksheet generator](#worksheet-generator)
   - [RAG: ingest](#rag-ingest)
   - [RAG: chat](#rag-chat)
+  - [Mini-Auth & RBAC (Demo)](#mini-auth--rbac-demo)
   - [Teachers & auth](#teachers--auth)
   - [Classes & students](#classes--students)
   - [Student profile & interests](#student-profile--interests)
   - [Media](#media)
   - [Gamification](#gamification)
   - [Lesson planner](#lesson-planner)
-- [Project structure](#project-structure)
-- [Tests (optional)](#tests-optional)
 
 ---
 
@@ -126,6 +126,14 @@ USER_API_BASE=http://api:8000
 # Media Storage
 # =========================
 MEDIA_ROOT=/data/media
+
+# =========================
+# Dev Admin (Bootstrap User)
+# =========================
+# Wird beim Start automatisch als Teacher mit role="dev" angelegt,
+# wenn noch kein User mit dieser E-Mail existiert.
+DEV_ADMIN_EMAIL=dev@example.com
+DEV_ADMIN_PASSWORD=dev123
 ```
 
 ---
@@ -209,6 +217,27 @@ EOF
 ```
 
 **Generate PDF from Worksheet JSON**
+
+```bash
+curl -X POST "http://localhost:8000/worksheet/pdf" \
+  -H "Content-Type: application/json" \
+  --data-binary @- << 'EOF'
+{
+  "title": "Arbeitsblatt: Füchse im Wald",
+  "tasks": [
+    { "question": "Frage 1" },
+    { "question": "Frage 2" }
+  ]
+}
+EOF
+```
+**Example response (/tasks/<task_id>):**
+```json
+{
+  "pdf_url": "/media-files/worksheet_....pdf"
+}
+```
+
 ### RAG: ingest
 
 #### Ingest text
@@ -220,12 +249,6 @@ curl -X POST "http://localhost:8000/ingest" \
     "text": "Paris is the capital of France.",
     "collection": "avatar_docs"
   }'
-```
-**Example response (/tasks/<task_id>):**
-```json
-{
-  "pdf_url": "/media-files/worksheet_....pdf"
-}
 ```
 
 #### Ingest with metadata
@@ -263,22 +286,28 @@ curl -X POST "http://localhost:8000/chat" \
 ---
 ### Mini-Auth & RBAC (Demo)
 
-- There are two roles:
-  - **Teacher** – registers via email/password and manages classes, students, media.
-  - **Student** – receives login details from the teacher and only uses the avatar.
-- Passwords are hashed with PBKDF2-SHA256 (`passlib`).
-- There are **no** JWTs/sessions – the frontend remembers `teacher_id` or `student_id`.
-- RBAC current:
-- Only teachers are allowed to create classes and students.
-- A student can only be deleted if the requesting `teacher_id` is the class teacher of that class (`/api/user/student/{student_id}`).
-- This model is deliberately kept simple and is only intended for local demo/school projects.
+- There are three roles:
+  - **Dev/Admin (`role=“dev"`)** – can register new teachers.
+  - **Teacher (`role=“teacher"`)** – manages classes, students, media.
+  - **Student (`role=“student"`)** – only uses the avatar.
+- Password hashing: PBKDF2-SHA256 (`passlib`).
+- There are **no** JWTs/sessions – the frontend only remembers `teacher_id` or `student_id`.
+- Current RBAC rules (simplified):
+  - Only a dev/admin may call `POST /api/teachers/register`  
+    → via `?creator_id=<dev_teacher_id>`.
+  - Only teachers may create classes and students.
+  - The student list for a class (`GET /api/classes/{class_id}/students`) is only visible
+    if `teacher_id` is the homeroom teacher of that class.
+  - A student may only be deleted if the calling `teacher_id`
+    is the homeroom teacher of that student's class (`DELETE /api/user/student/{student_id}`).
+- The model is deliberately simple and intended only for demo/school prototypes.
 
 ### Teachers & auth
 
 #### Register teacher
 
 ```bash
-curl -X POST "http://localhost:8000/api/teachers/register" \
+curl -X POST "http://localhost:8000/api/teachers/register?creator_id=1" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Demo Teacher",
@@ -296,6 +325,13 @@ curl -X POST "http://localhost:8000/api/auth/login" \
     "email": "demo@example.com",
     "password": "test123"
   }'
+```
+Example response:
+```json
+{
+  "teacher_id": 1,
+  "role": "teacher"   // or "dev" for admin
+}
 ```
 
 #### Request password reset (teacher)
@@ -342,7 +378,8 @@ Example response:
 ```json
 {
   "student_id": 1,
-  "class_id": 1
+  "class_id": 1,
+  "role": "student"
 }
 ```
 
