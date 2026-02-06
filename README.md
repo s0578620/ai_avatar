@@ -36,17 +36,24 @@ A Retrieval-Augmented Generation (RAG) based AI Avatar platform designed for edu
 ## Architecture
 
 ```
-Client (Browser / App)
+                  +---------------------+
+Client (Browser)  |   n8n Workflows     |
+        |         | (HTTP/Webhooks,     |
+        |         |  optional)          |
+        |         +----------+----------+
+        |                    |
+        |            (HTTP calls)
+        v                    v
+     FastAPI  <-----------------------
         |
-     FastAPI
-        |
-  -------------------------
-  |        |        |     |
-Redis   Celery   Postgres Qdrant
-  |                 |
-n8n Workflows     Media Storage
-        |
-     Gemini API
+  -----------------------------
+  |        |        |        |
+Redis   Celery   Postgres  Qdrant
+           |        |
+      RAG Core   User DB
+           |
+      Gemini API
+
 ```
 
 ## Requirements
@@ -285,8 +292,6 @@ curl -X POST "http://localhost:8000/chat" \
 ```
 
 ---
-### Mini-Auth & RBAC (Demo)
-
 ### Mini-Auth & RBAC (Demo)
 
 - There are three roles:

@@ -35,10 +35,8 @@ else:
         "until you configure it. See README for setup."
     )
 
-#CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
 EMB_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-001")
 CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
-#EMB_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/embedding-001")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 TOP_K = int(os.getenv("TOP_K", "4"))
@@ -71,8 +69,6 @@ class RAG:
             contents=texts,
             config=emb_config,
         )
-
-        # google-genai gibt result.embeddings, jeder mit .values
         vectors: List[List[float]] = [e.values for e in result.embeddings]
 
         return vectors
