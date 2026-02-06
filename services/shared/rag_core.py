@@ -13,7 +13,8 @@ from qdrant_client.http.models import (
     MatchValue,
 )
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -27,20 +28,21 @@ DEFAULT_PERSONA = (
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    genai_client = genai.Client(api_key=GEMINI_API_KEY)
 else:
     logger.warning(
         "GEMINI_API_KEY is not set. Gemini calls (embeddings/chat) will fail "
         "until you configure it. See README for setup."
     )
 
+#CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
+EMB_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-001")
 CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
-EMB_MODEL = os.getenv("GEMINI_EMBED_MODEL", "text-embedding-004")
-
+#EMB_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/embedding-001")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "qdrant")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", "6333"))
 TOP_K = int(os.getenv("TOP_K", "4"))
-
+genai_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 class RAG:
     def __init__(self):
@@ -49,27 +51,32 @@ class RAG:
     def _embed(self, texts: List[str]) -> List[List[float]]:
         """
         Erzeugt für jeden Text einen Embedding-Vektor mit Gemini.
-        EMB_MODEL = 'text-embedding-004' liefert 768-dimensionale Vektoren.
+        text-embedding-004 liefert 768-dimensionale Vektoren.
         """
-        if not GEMINI_API_KEY:
+        if not GEMINI_API_KEY or not genai_client:
             raise RuntimeError(
                 "GEMINI_API_KEY is not set. Cannot create embeddings. "
                 "Set the environment variable GEMINI_API_KEY (see README)."
             )
 
-        out: List[List[float]] = []
-        for t in texts:
-            if not t:
-                out.append([0.0] * 768)
-                continue
+        if not texts:
+            return []
 
-            res = genai.embed_content(
-                model=EMB_MODEL,
-                content=t,
-                task_type="retrieval_document",
-            )
-            out.append(res["embedding"])
-        return out
+        # Konfiguration für Retrieval-Embeddings
+        emb_config = types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT")
+
+        # Batch-Call: mehrere Texte auf einmal
+        result = genai_client.models.embed_content(
+            model=EMB_MODEL,
+            contents=texts,
+            config=emb_config,
+        )
+
+        # google-genai gibt result.embeddings, jeder mit .values
+        vectors: List[List[float]] = [e.values for e in result.embeddings]
+
+        return vectors
+
 
     # --------- Qdrant-Handling ---------
 
@@ -155,19 +162,19 @@ class RAG:
     # --------- Generieren mit Gemini ---------
 
     def generate(self, prompt: str) -> str:
-        """
-        Ruft das Chatmodell von Gemini auf.
-        """
-        if not GEMINI_API_KEY:
+        if not GEMINI_API_KEY or not genai_client:
             raise RuntimeError(
                 "GEMINI_API_KEY is not set. Cannot call Gemini model. "
                 "Set the environment variable GEMINI_API_KEY (see README)."
             )
 
-        model = genai.GenerativeModel(CHAT_MODEL)
-        resp = model.generate_content(prompt)
+        resp = genai_client.models.generate_content(
+            model=CHAT_MODEL,
+            contents=prompt,
+        )
 
         return (resp.text or "").strip()
+
 
     # --------- Promptbau ---------
 
