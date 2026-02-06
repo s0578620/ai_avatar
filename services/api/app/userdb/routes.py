@@ -128,6 +128,33 @@ def register_teacher(
     db.refresh(teacher)
     return teacher
 
+@router.post("/auth/dev-login")
+def dev_login(
+    payload: schemas.TeacherLogin,
+    db: Session = Depends(get_db),
+):
+    teacher = (
+        db.query(models.Teacher)
+        .filter(models.Teacher.email == payload.email)
+        .first()
+    )
+    if not teacher or not verify_password(payload.password, teacher.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        )
+
+    if teacher.role != "dev":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a dev/admin account",
+        )
+
+    return {
+        "dev_id": teacher.id,
+        "role": teacher.role,  # "dev"
+    }
+
 # ---------- Student ----------
 @router.post("/auth/student-login")
 def student_login(
@@ -166,10 +193,17 @@ def login_teacher(
             detail="Invalid credentials",
         )
 
+    if teacher.role != "teacher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Use /api/auth/dev-login for dev/admin accounts",
+        )
+
     return {
         "teacher_id": teacher.id,
         "role": teacher.role,
     }
+
 
 
 # ---------- Classes ----------
