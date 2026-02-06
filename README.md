@@ -132,6 +132,7 @@ MEDIA_ROOT=/data/media
 # =========================
 # Wird beim Start automatisch als Teacher mit role="dev" angelegt,
 # wenn noch kein User mit dieser E-Mail existiert.
+# Dieser Account kann sich über POST /api/auth/dev-login anmelden.
 DEV_ADMIN_EMAIL=dev@example.com
 DEV_ADMIN_PASSWORD=dev123
 ```
@@ -286,12 +287,18 @@ curl -X POST "http://localhost:8000/chat" \
 ---
 ### Mini-Auth & RBAC (Demo)
 
+### Mini-Auth & RBAC (Demo)
+
 - There are three roles:
-  - **Dev/Admin (`role=“dev"`)** – can register new teachers.
-  - **Teacher (`role=“teacher"`)** – manages classes, students, media.
-  - **Student (`role=“student"`)** – only uses the avatar.
+  - **Dev/Admin (`role="dev"`)** – can register new teachers and perform admin actions.
+  - **Teacher (`role="teacher"`)** – manages classes, students, media.
+  - **Student (`role="student"`)** – only uses the avatar.
 - Password hashing: PBKDF2-SHA256 (`passlib`).
-- There are **no** JWTs/sessions – the frontend only remembers `teacher_id` or `student_id`.
+- There are **no** JWTs/sessions – the frontend only remembers `teacher_id`, `dev_id` or `student_id`.
+- Authentication endpoints:
+  - Dev/Admin login: `POST /api/auth/dev-login` → returns `{ "dev_id": ..., "role": "dev" }`
+  - Teacher login: `POST /api/auth/login` → returns `{ "teacher_id": ..., "role": "teacher" }`
+  - Student login: `POST /api/auth/student-login` → returns `{ "student_id": ..., "class_id": ..., "role": "student" }`
 - Current RBAC rules (simplified):
   - Only a dev/admin may call `POST /api/teachers/register`  
     → via `?creator_id=<dev_teacher_id>`.
@@ -315,7 +322,27 @@ curl -X POST "http://localhost:8000/api/teachers/register?creator_id=1" \
     "password": "test123"
   }'
 ```
+### Dev/Admin login
 
+Der Dev-Admin-Account wird beim Start über die Umgebungsvariablen  
+`DEV_ADMIN_EMAIL` und `DEV_ADMIN_PASSWORD` angelegt (falls noch nicht vorhanden).
+
+```bash
+curl -X POST "http://localhost:8000/api/auth/dev-login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "dev@example.com",
+    "password": "dev123"
+  }'
+```
+
+Example response:
+```json
+{
+  "dev_id": 1,
+  "role": "dev"
+}
+```
 #### Teacher login
 
 ```bash
@@ -330,7 +357,7 @@ Example response:
 ```json
 {
   "teacher_id": 1,
-  "role": "teacher"   // or "dev" for admin
+  "role": "teacher"
 }
 ```
 
