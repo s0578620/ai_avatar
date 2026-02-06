@@ -103,7 +103,7 @@ MAX_HISTORY_MESSAGES=6
 # Never commit real keys!
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 GEMINI_CHAT_MODEL=gemini-2.5-flash
-GEMINI_EMBED_MODEL=text-embedding-004
+GEMINI_EMBED_MODEL=text-embedding-001
 
 # =========================
 # n8n
