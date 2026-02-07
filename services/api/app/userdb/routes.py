@@ -15,6 +15,9 @@ from .database import get_db
 from .security import hash_password, verify_password
 from .models import Teacher, PasswordResetToken
 
+from pathlib import Path
+from ..media import Media
+
 router = APIRouter(prefix="/api")
 
 class PasswordResetRequestIn(BaseModel):
@@ -241,6 +244,60 @@ def list_classes(
             query = query.filter(models.Class.teacher_id == teacher_id)
         return query.all()
 
+@router.delete("/classes/{class_id}")
+def delete_class(
+    class_id: int,
+    teacher_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Löscht eine Klasse, wenn der aufrufende Lehrer auch der Klassenlehrer ist.
+    Löscht (Media + Schüler + deren Gamification/Interests/Badges)
+    """
+    cls = db.query(models.Class).filter(models.Class.id == class_id).first()
+    if not cls:
+        raise HTTPException(status_code=404, detail="Class not found")
+
+    if cls.teacher_id != teacher_id:
+        raise HTTPException(status_code=403, detail="Not allowed to delete this class")
+
+    # 1) Media der Klasse löschen (inkl. Dateien), weil media.class_id -> classes.id
+    media_items = db.query(Media).filter(Media.class_id == class_id).all()
+    for m in media_items:
+        for p in [m.path, m.thumbnail_path]:
+            if p:
+                try:
+                    p_path = Path(p)
+                    if p_path.exists():
+                        p_path.unlink()
+                except OSError:
+                    pass
+        db.delete(m)
+
+    # 2) Schüler der Klasse löschen + abhängige Tabellen (wie bei delete_student)
+    students = db.query(models.Student).filter(models.Student.class_id == class_id).all()
+    for s in students:
+        sid = s.id
+
+        db.query(models.StudentBadge).filter(
+            models.StudentBadge.student_id == sid
+        ).delete(synchronize_session=False)
+
+        db.query(models.StudentInterest).filter(
+            models.StudentInterest.student_id == sid
+        ).delete(synchronize_session=False)
+
+        db.query(models.GamificationState).filter(
+            models.GamificationState.student_id == sid
+        ).delete(synchronize_session=False)
+
+        db.delete(s)
+
+    # 3) Klasse löschen
+    db.delete(cls)
+    db.commit()
+
+    return {"status": "deleted", "id": class_id}
 
 @router.post("/classes/{class_id}/students", response_model=schemas.StudentOut)
 def create_student(
