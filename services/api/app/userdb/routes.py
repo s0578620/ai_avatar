@@ -20,6 +20,9 @@ from ..media import Media
 
 router = APIRouter(prefix="/api")
 
+
+# ---------------- Password Reset ----------------
+
 class PasswordResetRequestIn(BaseModel):
     email: EmailStr
 
@@ -29,16 +32,10 @@ def request_password_reset(
     payload: PasswordResetRequestIn,
     db: Session = Depends(get_db),
 ):
-    # Immer 200 zurückgeben -> kein User-Enumeration
-    teacher = (
-        db.query(Teacher)
-        .filter(Teacher.email == payload.email)
-        .first()
-    )
+    teacher = db.query(Teacher).filter(Teacher.email == payload.email).first()
     if not teacher:
         return {"status": "ok"}
 
-    # zufälligen Token generieren (raw) und gehasht speichern
     raw_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
@@ -50,12 +47,8 @@ def request_password_reset(
     db.add(reset)
     db.commit()
 
-    # TODO: In echt -> E-Mail über n8n verschicken.
-    # Für Demo/Entwicklung: Token in der Response zurückgeben
-    return {
-        "status": "ok",
-        "reset_token": raw_token,  # NUR für Demo!
-    }
+    return {"status": "ok", "reset_token": raw_token}  # NUR Demo!
+
 
 class PasswordResetConfirmIn(BaseModel):
     token: str
@@ -74,51 +67,35 @@ def reset_password(
         .filter(PasswordResetToken.token_hash == token_hash)
         .first()
     )
-    if (
-        not reset
-        or reset.used_at is not None
-        or reset.expires_at < datetime.utcnow()
-    ):
+    if not reset or reset.used_at is not None or reset.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
     teacher = db.get(Teacher, reset.teacher_id)
     if not teacher:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    # vorhandene Hilfsfunktion nutzen
     teacher.password_hash = hash_password(payload.new_password)
     reset.used_at = datetime.utcnow()
 
     db.commit()
     return {"status": "ok"}
 
-# ---------- Teacher ----------
+
+# ---------------- Teacher ----------------
 
 @router.post("/teachers/register", response_model=schemas.TeacherOut)
 def register_teacher(
-        payload: schemas.TeacherCreate,
-        creator_id: int,
-        db: Session = Depends(get_db),
+    payload: schemas.TeacherCreate,
+    creator_id: int,
+    db: Session = Depends(get_db),
 ):
-    creator = (
-        db.query(models.Teacher)
-        .filter(models.Teacher.id == creator_id)
-        .first()
-    )
+    creator = db.query(models.Teacher).filter(models.Teacher.id == creator_id).first()
     if not creator or creator.role != "dev":
-        raise HTTPException(
-            status_code=403,
-            detail="Only dev/admin may register teachers",
-        )
-    existing = (
-        db.query(models.Teacher)
-        .filter(models.Teacher.email == payload.email)
-        .first()
-    )
+        raise HTTPException(status_code=403, detail="Only dev/admin may register teachers")
+
+    existing = db.query(models.Teacher).filter(models.Teacher.email == payload.email).first()
     if existing:
-        raise HTTPException(
-            status_code=400, detail="Teacher with this email already exists"
-        )
+        raise HTTPException(status_code=400, detail="Teacher with this email already exists")
 
     teacher = models.Teacher(
         name=payload.name,
@@ -131,94 +108,90 @@ def register_teacher(
     db.refresh(teacher)
     return teacher
 
-@router.post("/auth/dev-login")
-def dev_login(
-    payload: schemas.TeacherLogin,
+
+@router.get("/teachers", response_model=List[schemas.TeacherOut])
+def list_teachers(
+    creator_id: int,
     db: Session = Depends(get_db),
 ):
-    teacher = (
-        db.query(models.Teacher)
-        .filter(models.Teacher.email == payload.email)
-        .first()
-    )
+    creator = db.query(Teacher).filter(Teacher.id == creator_id).first()
+    if not creator or creator.role != "dev":
+        raise HTTPException(status_code=403, detail="Only dev/admin may list teachers")
+
+    return db.query(Teacher).filter(Teacher.role == "teacher").all()
+
+
+@router.delete("/teachers/{teacher_id}")
+def delete_teacher(
+    teacher_id: int,
+    creator_id: int,
+    db: Session = Depends(get_db),
+):
+    creator = db.query(Teacher).filter(Teacher.id == creator_id).first()
+    if not creator or creator.role != "dev":
+        raise HTTPException(status_code=403, detail="Only dev/admin may delete teachers")
+
+    if teacher_id == creator_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own dev account")
+
+    teacher = db.query(Teacher).filter(Teacher.id == teacher_id).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    if teacher.role == "dev":
+        raise HTTPException(status_code=400, detail="Cannot delete dev/admin accounts")
+
+    class_count = db.query(models.Class).filter(models.Class.teacher_id == teacher_id).count()
+    if class_count > 0:
+        raise HTTPException(status_code=400, detail="Teacher still owns classes. Delete classes first.")
+
+    db.delete(teacher)
+    db.commit()
+    return {"status": "deleted", "id": teacher_id}
+
+
+@router.post("/auth/dev-login")
+def dev_login(payload: schemas.TeacherLogin, db: Session = Depends(get_db)):
+    teacher = db.query(models.Teacher).filter(models.Teacher.email == payload.email).first()
+
     if not teacher or not verify_password(payload.password, teacher.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     if teacher.role != "dev":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not a dev/admin account",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a dev/admin account")
 
-    return {
-        "dev_id": teacher.id,
-        "role": teacher.role,  # "dev"
-    }
+    return {"dev_id": teacher.id, "role": teacher.role}
 
-# ---------- Student ----------
+
+# ---------------- Student Login ----------------
+
 @router.post("/auth/student-login")
-def student_login(
-    payload: schemas.StudentLogin,
-    db: Session = Depends(get_db),
-):
-    student = (
-        db.query(models.Student)
-        .filter(models.Student.username == payload.username)
-        .first()
-    )
+def student_login(payload: schemas.StudentLogin, db: Session = Depends(get_db)):
+    student = db.query(models.Student).filter(models.Student.username == payload.username).first()
     if not student or not verify_password(payload.password, student.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    return {
-        "student_id": student.id,
-        "class_id": student.class_id,
-        "role": "student",
-    }
+    return {"student_id": student.id, "class_id": student.class_id, "role": "student"}
+
+
 @router.post("/auth/login")
-def login_teacher(
-        payload: schemas.TeacherLogin,
-        db: Session = Depends(get_db),
-):
-    teacher = (
-        db.query(models.Teacher)
-        .filter(models.Teacher.email == payload.email)
-        .first()
-    )
+def login_teacher(payload: schemas.TeacherLogin, db: Session = Depends(get_db)):
+    teacher = db.query(models.Teacher).filter(models.Teacher.email == payload.email).first()
+
     if not teacher or not verify_password(payload.password, teacher.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     if teacher.role != "teacher":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Use /api/auth/dev-login for dev/admin accounts",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Use /api/auth/dev-login for dev/admin accounts")
 
-    return {
-        "teacher_id": teacher.id,
-        "role": teacher.role,
-    }
+    return {"teacher_id": teacher.id, "role": teacher.role}
 
 
-
-# ---------- Classes ----------
+# ---------------- Classes ----------------
 
 @router.post("/classes", response_model=schemas.ClassOut)
-def create_class(
-        payload: schemas.ClassCreate,
-        db: Session = Depends(get_db),
-):
-    teacher = db.query(models.Teacher).filter(
-        models.Teacher.id == payload.teacher_id
-    ).first()
+def create_class(payload: schemas.ClassCreate, db: Session = Depends(get_db)):
+    teacher = db.query(models.Teacher).filter(models.Teacher.id == payload.teacher_id).first()
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher not found")
 
@@ -235,25 +208,15 @@ def create_class(
 
 
 @router.get("/classes", response_model=List[schemas.ClassOut])
-def list_classes(
-        teacher_id: int | None = None,
-        db: Session = Depends(get_db),
-):
-        query = db.query(models.Class)
-        if teacher_id is not None:
-            query = query.filter(models.Class.teacher_id == teacher_id)
-        return query.all()
+def list_classes(teacher_id: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(models.Class)
+    if teacher_id is not None:
+        query = query.filter(models.Class.teacher_id == teacher_id)
+    return query.all()
+
 
 @router.delete("/classes/{class_id}")
-def delete_class(
-    class_id: int,
-    teacher_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Löscht eine Klasse, wenn der aufrufende Lehrer auch der Klassenlehrer ist.
-    Löscht (Media + Schüler + deren Gamification/Interests/Badges)
-    """
+def delete_class(class_id: int, teacher_id: int, db: Session = Depends(get_db)):
     cls = db.query(models.Class).filter(models.Class.id == class_id).first()
     if not cls:
         raise HTTPException(status_code=404, detail="Class not found")
@@ -261,7 +224,6 @@ def delete_class(
     if cls.teacher_id != teacher_id:
         raise HTTPException(status_code=403, detail="Not allowed to delete this class")
 
-    # 1) Media der Klasse löschen (inkl. Dateien), weil media.class_id -> classes.id
     media_items = db.query(Media).filter(Media.class_id == class_id).all()
     for m in media_items:
         for p in [m.path, m.thumbnail_path]:
@@ -274,46 +236,28 @@ def delete_class(
                     pass
         db.delete(m)
 
-    # 2) Schüler der Klasse löschen + abhängige Tabellen (wie bei delete_student)
     students = db.query(models.Student).filter(models.Student.class_id == class_id).all()
     for s in students:
         sid = s.id
 
-        db.query(models.StudentBadge).filter(
-            models.StudentBadge.student_id == sid
-        ).delete(synchronize_session=False)
-
-        db.query(models.StudentInterest).filter(
-            models.StudentInterest.student_id == sid
-        ).delete(synchronize_session=False)
-
-        db.query(models.GamificationState).filter(
-            models.GamificationState.student_id == sid
-        ).delete(synchronize_session=False)
+        db.query(models.StudentBadge).filter(models.StudentBadge.student_id == sid).delete(synchronize_session=False)
+        db.query(models.StudentInterest).filter(models.StudentInterest.student_id == sid).delete(synchronize_session=False)
+        db.query(models.GamificationState).filter(models.GamificationState.student_id == sid).delete(synchronize_session=False)
 
         db.delete(s)
 
-    # 3) Klasse löschen
     db.delete(cls)
     db.commit()
-
     return {"status": "deleted", "id": class_id}
 
+
 @router.post("/classes/{class_id}/students", response_model=schemas.StudentOut)
-def create_student(
-        class_id: int,
-        payload: schemas.StudentCreate,
-        db: Session = Depends(get_db),
-):
+def create_student(class_id: int, payload: schemas.StudentCreate, db: Session = Depends(get_db)):
     cls = db.query(models.Class).filter(models.Class.id == class_id).first()
     if not cls:
         raise HTTPException(status_code=404, detail="Class not found")
 
-    existing_username = (
-        db.query(models.Student)
-        .filter(models.Student.username == payload.username)
-        .first()
-    )
+    existing_username = db.query(models.Student).filter(models.Student.username == payload.username).first()
     if existing_username:
         raise HTTPException(status_code=400, detail="Username already exists")
 
@@ -330,15 +274,8 @@ def create_student(
 
 
 @router.get("/classes/{class_id}/students/export")
-def export_students(
-        class_id: int,
-        db: Session = Depends(get_db),
-):
-    students = (
-        db.query(models.Student)
-        .filter(models.Student.class_id == class_id)
-        .all()
-    )
+def export_students(class_id: int, db: Session = Depends(get_db)):
+    students = db.query(models.Student).filter(models.Student.class_id == class_id).all()
 
     output = StringIO()
     writer = csv.writer(output)
@@ -350,74 +287,31 @@ def export_students(
     return StreamingResponse(
         output,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="class_{class_id}_students.csv"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="class_{class_id}_students.csv"'},
     )
 
-@router.get(
-    "/classes/{class_id}/students",
-    response_model=List[schemas.StudentOut],
-)
-def list_students_for_class(
-    class_id: int,
-    teacher_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Gibt die Schüler einer Klasse zurück (nur für den passenden Lehrer).
 
-    Mini-RBAC:
-    - teacher_id muss zu class.teacher_id passen.
-    """
-    cls = (
-        db.query(models.Class)
-        .filter(models.Class.id == class_id)
-        .first()
-    )
+@router.get("/classes/{class_id}/students", response_model=List[schemas.StudentOut])
+def list_students_for_class(class_id: int, teacher_id: int, db: Session = Depends(get_db)):
+    cls = db.query(models.Class).filter(models.Class.id == class_id).first()
     if not cls:
         raise HTTPException(status_code=404, detail="Class not found")
 
     if cls.teacher_id != teacher_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Not allowed to view students of this class",
-        )
+        raise HTTPException(status_code=403, detail="Not allowed to view students of this class")
 
-    students = (
-        db.query(models.Student)
-        .filter(models.Student.class_id == class_id)
-        .all()
-    )
-    return students
-"""
-Request:
-    GET /classes/<class_id>/students?teacher_id=<teacher_id>
-Response:
-    [
-      { "id": 1, "name": "Max", "class_id": 1, "username": "max1" },
-      { "id": 2, "name": "Lena", "class_id": 1, "username": "lena1" }
-    ]
-"""
-# ---------- Interests & Profile ----------
+    return db.query(models.Student).filter(models.Student.class_id == class_id).all()
+
+
+# ---------------- Interests & Profile ----------------
 
 @router.post("/user/interests", response_model=schemas.StudentInterestOut)
-def add_interest(
-        payload: schemas.StudentInterestCreate,
-        db: Session = Depends(get_db),
-):
-    student = (
-        db.query(models.Student)
-        .filter(models.Student.id == payload.student_id)
-        .first()
-    )
+def add_interest(payload: schemas.StudentInterestCreate, db: Session = Depends(get_db)):
+    student = db.query(models.Student).filter(models.Student.id == payload.student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
-    interest = models.StudentInterest(
-        student_id=payload.student_id,
-        interest_text=payload.interest_text,
-    )
+    interest = models.StudentInterest(student_id=payload.student_id, interest_text=payload.interest_text)
     db.add(interest)
     db.commit()
     db.refresh(interest)
@@ -425,15 +319,8 @@ def add_interest(
 
 
 @router.get("/user/profile", response_model=schemas.UserProfile)
-def get_user_profile(
-        student_id: int,
-        db: Session = Depends(get_db),
-):
-    student = (
-        db.query(models.Student)
-        .filter(models.Student.id == student_id)
-        .first()
-    )
+def get_user_profile(student_id: int, db: Session = Depends(get_db)):
+    student = db.query(models.Student).filter(models.Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -448,21 +335,10 @@ def get_user_profile(
         interests=interests,
     )
 
+
 @router.delete("/user/student/{student_id}")
-def delete_student(
-    student_id: int,
-    teacher_id: int,
-    db: Session = Depends(get_db),
-):
-    """
-    Löscht einen Schüler wenn der aufrufende Lehrer
-    auch der Klassenlehrer dieses Schülers ist.
-    """
-    student = (
-        db.query(models.Student)
-        .filter(models.Student.id == student_id)
-        .first()
-    )
+def delete_student(student_id: int, teacher_id: int, db: Session = Depends(get_db)):
+    student = db.query(models.Student).filter(models.Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
 
@@ -473,19 +349,10 @@ def delete_student(
     if cls.teacher_id != teacher_id:
         raise HTTPException(status_code=403, detail="Not allowed to delete this student")
 
-    # Löscht alle Badges zuerst
-    db.query(models.StudentBadge).filter(
-    models.StudentBadge.student_id == student_id).delete(synchronize_session=False)
-    # Löscht Studentinterest
-    db.query(models.StudentInterest).filter(
-        models.StudentInterest.student_id == student_id).delete(synchronize_session=False)
-    # Löscht Gamifications
-    db.query(models.GamificationState).filter(
-        models.GamificationState.student_id == student_id
-    ).delete(synchronize_session=False)
+    db.query(models.StudentBadge).filter(models.StudentBadge.student_id == student_id).delete(synchronize_session=False)
+    db.query(models.StudentInterest).filter(models.StudentInterest.student_id == student_id).delete(synchronize_session=False)
+    db.query(models.GamificationState).filter(models.GamificationState.student_id == student_id).delete(synchronize_session=False)
 
-    # Löscht student
     db.delete(student)
     db.commit()
-
     return {"status": "deleted", "id": student_id}
